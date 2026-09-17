@@ -47,6 +47,8 @@ export interface WorldGenResult {
   /** 5회 재생성 실패 후 해수면 보정을 사용했는가 */
   seaLevelCompensated: boolean;
   generatorVersion: string;
+  /** 상태 초기화(§10)에 필요한 설정 회신 */
+  config: WorldConfig;
 }
 
 export interface GenerateWorldOptions {
@@ -101,6 +103,7 @@ export function generateWorld(
         settlements: placement.settlements,
         routes: placement.routes,
         seaLevelCompensated: false,
+        config,
         generatorVersion: GENERATOR_VERSION,
       };
     }
@@ -124,6 +127,7 @@ export function generateWorld(
       settlements: bestFull.placement.settlements,
       routes: bestFull.placement.routes,
       seaLevelCompensated: false,
+      config,
       generatorVersion: GENERATOR_VERSION,
     };
   }
@@ -144,6 +148,7 @@ export function generateWorld(
     settlements: placement.settlements,
     routes: placement.routes,
     seaLevelCompensated: true,
+    config,
     generatorVersion: GENERATOR_VERSION,
   };
 }

@@ -1,13 +1,16 @@
 "use client";
 
 import { Dices } from "lucide-react";
-import { useCallback, useState } from "react";
-import { generateClimate } from "@/world/generation/climate";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SimulationClient } from "@/simulation/client";
 import { computeLandRatio } from "@/world/generation/elevation";
-import { generateWorld, type WorldGenResult } from "@/world/generation/generator";
+import type { SettlementGen, RouteGen } from "@/world/generation/settlements";
 import { createDefaultWorldConfig } from "@/world/model/worldConfig";
+import type { WorldMap } from "@/world/model/worldMap";
+import type { SimSpeed, WorldSummary } from "@/workers/protocol";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
+import { TimeControls } from "./TimeControls";
 
 const RESOLUTIONS = [256, 512] as const;
 const LAYERS: Array<{ id: MapLayer; label: string }> = [
@@ -24,9 +27,25 @@ function randomSeed(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-interface GenerationState extends WorldGenResult {
+interface WorldView {
   seed: string;
+  map: WorldMap;
+  settlements: SettlementGen[];
+  routes: RouteGen[];
+  seaLevel: number;
+  attempts: number;
+  seaLevelCompensated: boolean;
 }
+
+const INITIAL_SUMMARY: WorldSummary = {
+  tick: 0,
+  year: 0,
+  month: 0,
+  season: "winter",
+  totalPopulation: 0,
+  paused: true,
+  speed: 1,
+};
 
 export function GeneratorPanel() {
   const [seed, setSeed] = useState("");
@@ -34,30 +53,68 @@ export function GeneratorPanel() {
   const [seaLevel, setSeaLevel] = useState(0.5);
   const [layer, setLayer] = useState<MapLayer>("elevation");
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
-  const [world, setWorld] = useState<GenerationState | null>(null);
+  const [world, setWorld] = useState<WorldView | null>(null);
+  const [summary, setSummary] = useState<WorldSummary>(INITIAL_SUMMARY);
+  const clientRef = useRef<SimulationClient | null>(null);
+  const initSeqRef = useRef(0);
+
+  useEffect(() => {
+    const client = new SimulationClient({
+      onTickBatch: (notification) => setSummary(notification.summary),
+    });
+    clientRef.current = client;
+    return () => {
+      client.dispose();
+      clientRef.current = null;
+    };
+  }, []);
+
+  const initWorld = useCallback(
+    async (seedValue: string, options?: { seaLevel?: number; revealSeed?: boolean }) => {
+      const client = clientRef.current;
+      if (!client) return;
+      const seq = ++initSeqRef.current;
+      const config = createDefaultWorldConfig(seedValue);
+      config.resolution = resolution;
+      const payload = await client.init(config, options?.seaLevel ?? seaLevel);
+      if (seq !== initSeqRef.current) return; // 이후 재요청이 있으면 폐기
+      setWorld({
+        seed: seedValue,
+        map: payload.map,
+        settlements: payload.settlements,
+        routes: payload.routes,
+        seaLevel: payload.seaLevel,
+        attempts: payload.attempts,
+        seaLevelCompensated: payload.seaLevelCompensated,
+      });
+      setSelectedCell(null);
+      if (options?.revealSeed) setSeed(seedValue);
+    },
+    [resolution, seaLevel],
+  );
 
   const generate = useCallback(() => {
     const effectiveSeed = seed.trim() === "" ? randomSeed() : seed.trim();
-    const config = createDefaultWorldConfig(effectiveSeed);
-    config.resolution = resolution;
-    const result = generateWorld(config);
-    setWorld({ ...result, seed: effectiveSeed });
-    setSelectedCell(null);
-    if (seed.trim() === "") setSeed(effectiveSeed); // 자동 생성 시드 표시
-  }, [seed, resolution]);
+    void initWorld(effectiveSeed, { revealSeed: seed.trim() === "" });
+  }, [initWorld, seed]);
 
-  // 해수면 변경 → 기후·바이옴 즉시 재계산(고도 불변, 결정론 유지)
+  // 해수면 변경 → Worker에서 전체 재생성(같은 시드 → 같은 고도, 새 기후) 후 즉시 반영
   const handleSeaLevelChange = (value: number) => {
     setSeaLevel(value);
     if (world) {
-      const config = createDefaultWorldConfig(world.seed);
-      config.resolution = resolution;
-      generateClimate(world.map, config, value);
-      setWorld({ ...world }); // map은 제자리 갱신 — 새 참조로 재렌더 트리거
+      void initWorld(world.seed, { seaLevel: value });
     }
   };
 
-  const landRatio = world ? computeLandRatio(world.map.elevation, seaLevel) : null;
+  const handleSetSpeed = (speed: SimSpeed) => {
+    clientRef.current?.setSpeed(speed);
+  };
+
+  const handleStep = (ticks: 1 | 12) => {
+    clientRef.current?.step(ticks);
+  };
+
+  const landRatio = world ? computeLandRatio(world.map.elevation, world.seaLevel) : null;
 
   return (
     <section className="w-full max-w-3xl rounded-lg border border-border bg-surface p-xl shadow-panel">
@@ -121,7 +178,9 @@ export function GeneratorPanel() {
 
       {world ? (
         <>
-          <div className="mt-lg flex flex-wrap items-center gap-md">
+          <TimeControls summary={summary} onSetSpeed={handleSetSpeed} onStep={handleStep} />
+
+          <div className="mt-md flex flex-wrap items-center gap-md">
             <p className="flex flex-wrap items-center gap-x-md gap-y-xs text-text-muted">
               <span>
                 육지{" "}
@@ -167,7 +226,7 @@ export function GeneratorPanel() {
 
           <MapCanvas
             map={world.map}
-            seaLevel={seaLevel}
+            seaLevel={world.seaLevel}
             layer={layer}
             settlements={world.settlements}
             routes={world.routes}
@@ -175,7 +234,7 @@ export function GeneratorPanel() {
           />
 
           {selectedCell && (
-            <CellInspector map={world.map} cell={selectedCell} seaLevel={seaLevel} />
+            <CellInspector map={world.map} cell={selectedCell} seaLevel={world.seaLevel} />
           )}
         </>
       ) : (
