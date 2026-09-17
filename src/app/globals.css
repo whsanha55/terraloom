@@ -1,0 +1,36 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+@import "tailwindcss";
+
+/*
+ * World Observatory 디자인 토큰 — docs/DESIGN.md (2026-09-17 확정)
+ * 색 규칙: --primary는 선택·주요 행동·재생에만. 주황/빨강은 위험 상태 전용.
+ */
+@theme {
+  --color-primary: #2563eb; /* blue-600 */
+  --color-on-primary: #ffffff;
+  --color-surface: #ffffff; /* 패널 */
+  --color-border: #e2e8f0; /* 패널 보더 */
+  --color-text: #0f172a; /* slate-900 */
+  --color-text-muted: #64748b; /* slate-500 */
+  --color-background: #f1f5f9; /* slate-100 차가운 회백 */
+  --color-accent: #eff6ff; /* blue-50 호버·선택 표면 */
+  --color-warning: #ea580c; /* orange-600 — 위험 상태 전용 */
+  --color-error: #dc2626; /* red-600 — 위험 상태 전용 */
+
+  --font-sans: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo",
+    "Segoe UI", sans-serif;
+  --font-numeric: var(--font-inter), "Pretendard Variable", sans-serif;
+
+  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+
+/* 수치는 항상 tabular-nums — 실시간 갱신 흔들림 방지 (DESIGN.md) */
+@utility tnum {
+  font-feature-settings: "tnum";
+}
+
+/* 본문 14px 최소, 행간 1.6 (DESIGN.md typography.body) */
+body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
