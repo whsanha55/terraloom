@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { generateClimate } from "@/world/generation/climate";
 import { computeLandRatio } from "@/world/generation/elevation";
 import { generateWorld, type WorldGenResult } from "@/world/generation/generator";
+import { createDefaultWorldConfig } from "@/world/model/worldConfig";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
 
@@ -37,7 +38,9 @@ export function GeneratorPanel() {
 
   const generate = useCallback(() => {
     const effectiveSeed = seed.trim() === "" ? randomSeed() : seed.trim();
-    const result = generateWorld({ seed: effectiveSeed, resolution, cityRadius: 3 });
+    const config = createDefaultWorldConfig(effectiveSeed);
+    config.resolution = resolution;
+    const result = generateWorld(config);
     setWorld({ ...result, seed: effectiveSeed });
     setSelectedCell(null);
     if (seed.trim() === "") setSeed(effectiveSeed); // 자동 생성 시드 표시
@@ -47,7 +50,9 @@ export function GeneratorPanel() {
   const handleSeaLevelChange = (value: number) => {
     setSeaLevel(value);
     if (world) {
-      generateClimate(world.map, { seed: world.seed, resolution, cityRadius: 3 }, value);
+      const config = createDefaultWorldConfig(world.seed);
+      config.resolution = resolution;
+      generateClimate(world.map, config, value);
       setWorld({ ...world }); // map은 제자리 갱신 — 새 참조로 재렌더 트리거
     }
   };
@@ -127,6 +132,10 @@ export function GeneratorPanel() {
               <span className="font-numeric tnum">
                 시도 {world.attempts}/5{world.attempts > 1 ? " (재구성)" : ""}
               </span>
+              <span className="font-numeric tnum">
+                도시 <span data-testid="settlement-count">{world.settlements.length}</span> · 교역로{" "}
+                {world.routes.length}
+              </span>
               {world.seaLevelCompensated && (
                 <span className="rounded-full bg-[#FFF7ED] px-sm py-1 font-medium text-warning">
                   해수면 보정됨
@@ -160,6 +169,8 @@ export function GeneratorPanel() {
             map={world.map}
             seaLevel={seaLevel}
             layer={layer}
+            settlements={world.settlements}
+            routes={world.routes}
             onSelectCell={setSelectedCell}
           />
 

@@ -140,6 +140,18 @@ export function generateClimate(
     map.moisture[i] = span > 0 ? (map.moisture[i] - moistureMin) / span : 0.5;
   }
 
+  // 비옥도 — 농업 생산·도시 입지의 기준값(§10.4). 물은 0.
+  for (let i = 0; i < width * height; i++) {
+    const e = map.elevation[i];
+    if (e < seaLevel) {
+      map.fertility[i] = 0;
+      continue;
+    }
+    const landHeight01 = e > seaLevel && seaLevel < 1 ? (e - seaLevel) / (1 - seaLevel) : 0;
+    const tempFactor = clamp01(1 - Math.abs(map.temperature[i] - 0.55) * 1.6);
+    map.fertility[i] = clamp01(tempFactor * map.moisture[i] * (1 - 0.8 * landHeight01));
+  }
+
   // 바이옴
   for (let i = 0; i < width * height; i++) {
     map.biome[i] = classifyBiome(map.temperature[i], map.moisture[i], map.elevation[i], seaLevel);

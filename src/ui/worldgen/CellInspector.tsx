@@ -18,6 +18,8 @@ export function CellInspector({ map, cell, seaLevel }: CellInspectorProps) {
     { label: "고도", value: map.elevation[index].toFixed(3) },
     { label: "온도", value: map.temperature[index].toFixed(3) },
     { label: "습도", value: map.moisture[index].toFixed(3) },
+    { label: "비옥도", value: map.fertility[index].toFixed(3) },
+    { label: "강 유량", value: map.riverVolume[index].toFixed(3) },
     { label: "바이옴", value: biome?.name ?? "알 수 없음" },
     { label: "구분", value: isLand ? "육지" : "바다" },
   ];

@@ -38,6 +38,18 @@ describe("generateClimate", () => {
     }
   });
 
+  it("비옥도는 [0,1]이고 물에서는 0이다", () => {
+    const { map } = generateWorld(config("climate-fertility"));
+    for (let i = 0; i < map.fertility.length; i++) {
+      expect(Number.isFinite(map.fertility[i])).toBe(true);
+      expect(map.fertility[i]).toBeGreaterThanOrEqual(0);
+      expect(map.fertility[i]).toBeLessThanOrEqual(1);
+      if (map.elevation[i] < 0.5) {
+        expect(map.fertility[i]).toBe(0);
+      }
+    }
+  });
+
   it("극지방행이 적도행보다 평균 온도가 낮다 (위도 기반 온도)", () => {
     const { map } = generateWorld(config("climate-lat"));
     const width = map.width;

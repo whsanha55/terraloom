@@ -29,3 +29,11 @@ test("셀을 클릭하면 상세 검사기에 계산값이 표시된다", async 
   await expect(inspector).toContainText("바이옴");
   await expect(inspector).toContainText("고도");
 });
+
+test("도시 10~30개와 교역로가 표시된다 (Step 4)", async ({ page }) => {
+  await generateWorldWithSeed(page);
+  const count = await page.getByTestId("settlement-count").textContent();
+  const parsed = Number(count);
+  expect(parsed).toBeGreaterThanOrEqual(10);
+  expect(parsed).toBeLessThanOrEqual(30);
+});

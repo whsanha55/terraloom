@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { RouteGen, SettlementGen } from "@/world/generation/settlements";
 import type { WorldMap } from "@/world/model/worldMap";
 import { renderElevationRGBA } from "@/world/rendering/elevationRender";
 import { renderBiomeRGBA, renderScalarRGBA } from "@/world/rendering/layerRender";
@@ -23,10 +24,19 @@ interface MapCanvasProps {
   map: WorldMap;
   seaLevel: number;
   layer: MapLayer;
+  settlements: SettlementGen[];
+  routes: RouteGen[];
   onSelectCell?: (cell: { x: number; y: number }) => void;
 }
 
-export function MapCanvas({ map, seaLevel, layer, onSelectCell }: MapCanvasProps) {
+export function MapCanvas({
+  map,
+  seaLevel,
+  layer,
+  settlements,
+  routes,
+  onSelectCell,
+}: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -63,7 +73,36 @@ export function MapCanvas({ map, seaLevel, layer, onSelectCell }: MapCanvasProps
     const imageData = ctx.createImageData(map.width, map.height);
     imageData.data.set(rgba);
     ctx.putImageData(imageData, 0, 0);
-  }, [map, seaLevel, layer]);
+
+    // 강·도시·교역로 오버레이 — 지형 계열 레이어에만 표시(데이터 레이어는 값 그대로)
+    const scale = map.width / 256;
+    ctx.lineWidth = Math.max(1, scale * 1.5);
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.5)";
+    if (layer === "elevation" || layer === "biome") {
+      const byId = new Map(settlements.map((s) => [s.id, s]));
+      ctx.beginPath();
+      for (const route of routes) {
+        const a = byId.get(route.settlementIds[0]);
+        const b = byId.get(route.settlementIds[1]);
+        if (!a || !b) continue;
+        ctx.moveTo(a.x + 0.5, a.y + 0.5);
+        ctx.lineTo(b.x + 0.5, b.y + 0.5);
+      }
+      ctx.stroke();
+
+      // 도시 = 파란 원 (DESIGN.md 지도 마커 규칙)
+      ctx.fillStyle = "#2563EB";
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = Math.max(1, scale);
+      const radius = Math.max(2, scale * 2);
+      for (const settlement of settlements) {
+        ctx.beginPath();
+        ctx.arc(settlement.x + 0.5, settlement.y + 0.5, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }, [map, seaLevel, layer, settlements, routes]);
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onSelectCell) return;
