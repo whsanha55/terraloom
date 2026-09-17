@@ -3,16 +3,16 @@
 name: World Observatory
 description: 차가운 회백 위 흰 패널의 현대적 세계 시뮬레이션 운영 콘솔 — 블루 주 강조, 위험만 주황·빨강
 colors:
-  primary: "#2563EB"          # blue-600 — 선택·주요 행동·재생
+  primary: "#2563EB" # blue-600 — 선택·주요 행동·재생
   on-primary: "#FFFFFF"
-  surface: "#FFFFFF"          # 패널은 흰색
-  text: "#0F172A"             # slate-900
-  text-muted: "#64748B"       # slate-500
-  background: "#F1F5F9"       # slate-100 — 차가운 회백 (페이지 배경)
-  accent: "#EFF6FF"           # blue-50 — 호버·선택 표면
+  surface: "#FFFFFF" # 패널은 흰색
+  text: "#0F172A" # slate-900
+  text-muted: "#64748B" # slate-500
+  background: "#F1F5F9" # slate-100 — 차가운 회백 (페이지 배경)
+  accent: "#EFF6FF" # blue-50 — 호버·선택 표면
   success: "#2563EB"
-  warning: "#EA580C"          # orange-600 — 위험 상태 전용
-  error: "#DC2626"            # red-600 — 위험 상태 전용
+  warning: "#EA580C" # orange-600 — 위험 상태 전용
+  error: "#DC2626" # red-600 — 위험 상태 전용
 typography:
   display:
     fontFamily: "Pretendard Variable"
@@ -21,15 +21,15 @@ typography:
     letterSpacing: "-0.01em"
   body:
     fontFamily: "Pretendard Variable"
-    fontSize: "0.875rem"      # 14px 최소 — 본문은 14px 미만 금지
+    fontSize: "0.875rem" # 14px 최소 — 본문은 14px 미만 금지
     lineHeight: 1.6
   label:
     fontFamily: "Pretendard Variable"
-    fontSize: "0.8125rem"     # 13px — 보조 메타만
+    fontSize: "0.8125rem" # 13px — 보조 메타만
     fontWeight: 500
   mono:
     fontFamily: "Inter"
-    fontFeature: "tnum"       # 모든 수치 — 실시간 갱신 흔들림 방지
+    fontFeature: "tnum" # 모든 수치 — 실시간 갱신 흔들림 방지
 rounded:
   sm: 4px
   md: 6px
@@ -128,7 +128,8 @@ shadcn/ui 표준 컴포넌트(Button, Sheet, Tabs, Badge)를 토큰으로 구성
 - **The one authored moment:** 재생 헤드 진행과 도시 수치 갱신 — 깜빡임 없이 값만 교체
 
 ## Decisions Log
-| Date | Decision | Rationale |
-|------|----------|-----------|
+
+| Date       | Decision                      | Rationale                                                                                                                                                   |
+| ---------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-17 | Initial design system created | /design-consultation — 관측소/잉크 방향 폐기, 사용자 지정 현대 운영 콘솔 스펙(Next.js·shadcn/ui·Tailwind·Lucide·Pretendard/Inter·회백/화이트·블루)으로 확정 |
-| 2026-09-17 | 마커·경로 시각 규칙 통일 | 운영자의 즉시 판단 — 원=도시(면적=인구), 다이아몬드=사건(위험도색), 화살표=이동 |
+| 2026-09-17 | 마커·경로 시각 규칙 통일      | 운영자의 즉시 판단 — 원=도시(면적=인구), 다이아몬드=사건(위험도색), 화살표=이동                                                                             |

@@ -17,8 +17,9 @@
   --color-warning: #ea580c; /* orange-600 — 위험 상태 전용 */
   --color-error: #dc2626; /* red-600 — 위험 상태 전용 */
 
-  --font-sans: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo",
-    "Segoe UI", sans-serif;
+  --font-sans:
+    "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo", "Segoe UI",
+    sans-serif;
   --font-numeric: var(--font-inter), "Pretendard Variable", sans-serif;
 
   --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.05);

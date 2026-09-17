@@ -17,17 +17,17 @@
 
 ## 스크립트
 
-| 명령 | 설명 |
-| --- | --- |
-| `npm run dev` | 개발 서버 |
-| `npm run build` | 프로덕션 빌드 |
-| `npm run start` | 프로덕션 서버 |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Vitest (watch) |
-| `npm run test:run` | Vitest (1회 실행) |
-| `npm run e2e` | Playwright E2E (`npm run build` 후) |
-| `npm run format` | Prettier 포맷 |
+| 명령                | 설명                                |
+| ------------------- | ----------------------------------- |
+| `npm run dev`       | 개발 서버                           |
+| `npm run build`     | 프로덕션 빌드                       |
+| `npm run start`     | 프로덕션 서버                       |
+| `npm run lint`      | ESLint                              |
+| `npm run typecheck` | `tsc --noEmit`                      |
+| `npm run test`      | Vitest (watch)                      |
+| `npm run test:run`  | Vitest (1회 실행)                   |
+| `npm run e2e`       | Playwright E2E (`npm run build` 후) |
+| `npm run format`    | Prettier 포맷                       |
 
 ## 기술 스택 (2026-09-17 확정)
 

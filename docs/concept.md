@@ -6,18 +6,18 @@
 
 ## 0. 문서 정보
 
-| 항목 | 내용 |
-|---|---|
-| 프로젝트 가칭 | World Observatory |
-| 프로젝트 유형 | 절차적 세계 생성 + 시간 기반 시뮬레이션 + 관찰 및 관리 |
-| 개발 형태 | 1인 개발, LLM 기반 바이브코딩 |
-| 우선 플랫폼 | 데스크톱 웹 |
-| 초기 배포 형태 | 정적 웹 또는 로컬 실행 |
-| 핵심 언어 | TypeScript |
-| 핵심 목표 | 살아 움직이는 세계의 변화와 인과관계를 관찰하는 것 |
-| 부가 목표 | 시뮬레이션, 이벤트 시스템, 결정론, 데이터 시각화 학습 |
-| 수익화 우선순위 | 낮음 |
-| 연구 및 학습 우선순위 | 높음 |
+| 항목                  | 내용                                                   |
+| --------------------- | ------------------------------------------------------ |
+| 프로젝트 가칭         | World Observatory                                      |
+| 프로젝트 유형         | 절차적 세계 생성 + 시간 기반 시뮬레이션 + 관찰 및 관리 |
+| 개발 형태             | 1인 개발, LLM 기반 바이브코딩                          |
+| 우선 플랫폼           | 데스크톱 웹                                            |
+| 초기 배포 형태        | 정적 웹 또는 로컬 실행                                 |
+| 핵심 언어             | TypeScript                                             |
+| 핵심 목표             | 살아 움직이는 세계의 변화와 인과관계를 관찰하는 것     |
+| 부가 목표             | 시뮬레이션, 이벤트 시스템, 결정론, 데이터 시각화 학습  |
+| 수익화 우선순위       | 낮음                                                   |
+| 연구 및 학습 우선순위 | 높음                                                   |
 
 ---
 
@@ -441,36 +441,36 @@ MVP의 기본 시뮬레이션 단위는 한 달이다.
 
 기본 틱 속도: **1배속 = 2초/틱** (1년 = 24초, 100년 = 약 33분).
 
-| 모드 | 처리 방식 |
-|---|---|
-| 일시 정지 | 틱 처리 없음 |
-| 1배속 | 2초당 1틱 (기본값) |
-| 10배속 | 초당 5틱 (0.2초/틱) |
-| 100배속 | 초당 50틱 (0.02초/틱) |
+| 모드      | 처리 방식                                                                  |
+| --------- | -------------------------------------------------------------------------- |
+| 일시 정지 | 틱 처리 없음                                                               |
+| 1배속     | 2초당 1틱 (기본값)                                                         |
+| 10배속    | 초당 5틱 (0.2초/틱)                                                        |
+| 100배속   | 초당 50틱 (0.02초/틱)                                                      |
 | 최대 속도 | 렌더링보다 계산을 우선하여 가능한 만큼 처리 (목표 배속이 아닌 처리율 상한) |
-| 1틱 진행 | 정확히 한 달 진행 |
-| 1년 진행 | 정확히 12틱 진행 |
+| 1틱 진행  | 정확히 한 달 진행                                                          |
+| 1년 진행  | 정확히 12틱 진행                                                           |
 
 ### 9.2 시스템 실행 주기와 순서 (단일 소스)
 
 시뮬레이션 규칙의 실행 정의는 이 표 하나로 유지한다(이중 유지 금지). 매월 시스템은 §9.3의 틱 내부 순서를 따른다.
 
-| 순서 | 시스템 | 주기 |
-|---|---|---|
-| §9.3.1~2 | 이벤트 지속 시간 갱신·예정 활성화 | 매월 |
-| §9.3.3 | 기존 이벤트 효과 적용(수정자 스택) | 매월 |
-| §9.3.4 | 기후 상태 계산 | 매월 |
-| §9.3.5 | 농업 생산 계산 | 매월 |
-| §9.3.6 | 식량 정산(수요·공급·재고·미충족, §9.4) | 매월 |
-| §9.3.7 | 교역 계산 | 매월 |
-| §9.3.8 | 인구 변화 계산(원장 기록) | 매월 |
-| §9.3.9 | 이주 공동 정산(§9.6) | 매월 |
-| §9.3.10 | 질병·안정도 계산 | 매월 |
-| §9.3.11~14 | 사건 평가·발생·종료 | 매월 |
-| 도시 성장 | 수용력 재평가 | 매년(12틱) |
-| 기술 발전 | 기술 수준 갱신 | 매년 |
-| 영토 변화 | 영토·지역 재조정 | 매년 |
-| 장기 기후 변화 | 기후 추세 갱신 | 10년(120틱) |
+| 순서           | 시스템                                 | 주기        |
+| -------------- | -------------------------------------- | ----------- |
+| §9.3.1~2       | 이벤트 지속 시간 갱신·예정 활성화      | 매월        |
+| §9.3.3         | 기존 이벤트 효과 적용(수정자 스택)     | 매월        |
+| §9.3.4         | 기후 상태 계산                         | 매월        |
+| §9.3.5         | 농업 생산 계산                         | 매월        |
+| §9.3.6         | 식량 정산(수요·공급·재고·미충족, §9.4) | 매월        |
+| §9.3.7         | 교역 계산                              | 매월        |
+| §9.3.8         | 인구 변화 계산(원장 기록)              | 매월        |
+| §9.3.9         | 이주 공동 정산(§9.6)                   | 매월        |
+| §9.3.10        | 질병·안정도 계산                       | 매월        |
+| §9.3.11~14     | 사건 평가·발생·종료                    | 매월        |
+| 도시 성장      | 수용력 재평가                          | 매년(12틱)  |
+| 기술 발전      | 기술 수준 갱신                         | 매년        |
+| 영토 변화      | 영토·지역 재조정                       | 매년        |
+| 장기 기후 변화 | 기후 추세 갱신                         | 10년(120틱) |
 
 주기와 순서는 시뮬레이션 규칙의 일부이므로 버전 관리한다.
 
@@ -528,7 +528,13 @@ type SimRequest =
 
 // 통지 (Worker → UI)
 type SimNotification =
-  | { type: "tickBatch"; fromTick: number; toTick: number; summary: WorldSummary; changes: StateChange[] }
+  | {
+      type: "tickBatch";
+      fromTick: number;
+      toTick: number;
+      summary: WorldSummary;
+      changes: StateChange[];
+    }
   | { type: "majorEvent"; event: ActiveWorldEvent; paused: boolean }
   | { type: "statsUpdate"; series: StatisticsUpdate }
   | { type: "systemStatus"; level: "info" | "warning" | "error"; code: string; message: string }
@@ -828,10 +834,10 @@ interface FollowUpCandidate {
 
 기본 시스템이 이미 계산하는 변화를 사건 효과로 다시 적용하는 **이중 적용을 금지**한다. 모든 템플릿은 둘 중 하나로 분류한다 (`EventTemplate.kind`).
 
-| 유형 | 의미 | 예 | 효과 제한 |
-|---|---|---|---|
+| 유형                    | 의미                                         | 예                                | 효과 제한                                                                     |
+| ----------------------- | -------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
 | `notification` (통지형) | 기본 시스템 계산 결과를 사건으로 기록·알림만 | 도시 성장, 도시 쇠퇴, 대규모 이주 | `immediateEffects`·`ongoingEffects` 금지 — 원장 귀속용 `sourceEventId`만 생성 |
-| `effect` (효과형) | 수정자 스택으로 실제 상태 변화를 추가 | 가뭄, 홍수, 전염병, 폭동 | §12.2.1 수정자 스택 필수, §20 수치 범위 준수 |
+| `effect` (효과형)       | 수정자 스택으로 실제 상태 변화를 추가        | 가뭄, 홍수, 전염병, 폭동          | §12.2.1 수정자 스택 필수, §20 수치 범위 준수                                  |
 
 - 통지형의 발생 판정은 기본 계산 결과가 임계값을 넘는지로 대체한다 (예: 순이주 ≥ 인구의 5% → "대규모 이주" 통지)
 - 통지형은 원장(§8.3)의 원인 라벨을 풍부하게 만들 뿐 수치를 바꾸지 않는다
@@ -1224,14 +1230,14 @@ LLM이 수정할 수 있는 메트릭은 허용 목록으로 제한한다.
 
 예:
 
-| 효과 | 한 사건에서 허용 범위 |
-|---|---:|
-| 식량 생산 배율 | 0.5~1.5 |
-| 안정도 변화 | -15~15 |
-| 질병 수준 변화 | -0.2~0.2 |
-| 이주 압력 변화 | -0.3~0.3 |
-| 교역로 용량 배율 | 0.3~1.5 |
-| 사건 지속 시간 | 1~36틱 |
+| 효과             | 한 사건에서 허용 범위 |
+| ---------------- | --------------------: |
+| 식량 생산 배율   |               0.5~1.5 |
+| 안정도 변화      |                -15~15 |
+| 질병 수준 변화   |              -0.2~0.2 |
+| 이주 압력 변화   |              -0.3~0.3 |
+| 교역로 용량 배율 |               0.3~1.5 |
+| 사건 지속 시간   |                1~36틱 |
 
 범위를 벗어나면 다음 중 하나로 처리한다.
 
@@ -1308,13 +1314,13 @@ LLM 사용 불가 → 내장 이벤트 템플릿 사용
 
 LLM 실패 대응과 대칭되는 내장 경로 대응. 한 템플릿의 버그가 전체 시뮬레이션을 죽이지 않는다.
 
-| 오류 | 원인 | 격리 동작 | 사용자 노출 |
-|---|---|---|---|
-| `UnknownMetricError` | 템플릿이 허용 목록 밖 메트릭 참조 | 해당 템플릿 비활성화 + 경고 로그, 시뮬 계속 | systemStatus 배너 "사건 X 비활성화됨" |
-| `InvalidTemplateError` | 스키마·범위 위반 (내장/LLM 공통) | 등록 거부, 나머지 템플릿 정상 | systemStatus 경고 |
-| `InvalidEffectTarget` | 존재하지 않는 도시/루트 참조 | 해당 인스턴스 건너뜀, 원장에 기록 | 디버그 패널 |
-| `SnapshotQuotaError` | IndexedDB 용량 초과 | 오래된 자동 스냅샷 정리 후 재시도, 실패 시 저장 중단 | 배너 "저장 공간 부족" |
-| `SnapshotCorruptError` | 로드 데이터 손상/버전 불일치 | 로드 거부 + 안내 (§28.3) | 대화상자 "버전이 달라 열 수 없음" |
+| 오류                   | 원인                              | 격리 동작                                            | 사용자 노출                           |
+| ---------------------- | --------------------------------- | ---------------------------------------------------- | ------------------------------------- |
+| `UnknownMetricError`   | 템플릿이 허용 목록 밖 메트릭 참조 | 해당 템플릿 비활성화 + 경고 로그, 시뮬 계속          | systemStatus 배너 "사건 X 비활성화됨" |
+| `InvalidTemplateError` | 스키마·범위 위반 (내장/LLM 공통)  | 등록 거부, 나머지 템플릿 정상                        | systemStatus 경고                     |
+| `InvalidEffectTarget`  | 존재하지 않는 도시/루트 참조      | 해당 인스턴스 건너뜀, 원장에 기록                    | 디버그 패널                           |
+| `SnapshotQuotaError`   | IndexedDB 용량 초과               | 오래된 자동 스냅샷 정리 후 재시도, 실패 시 저장 중단 | 배너 "저장 공간 부족"                 |
+| `SnapshotCorruptError` | 로드 데이터 손상/버전 불일치      | 로드 거부 + 안내 (§28.3)                             | 대화상자 "버전이 달라 열 수 없음"     |
 
 모든 오류는 원인·틱·대상을 포함한 구조화 로그로 남는다 ("swallow and continue" 금지 — 경고가 보여야 계속하는 것).
 
@@ -1343,10 +1349,10 @@ interface LLMGenerationRecord {
   approvedBy: "user" | "automatic";
 
   // 재현성 보강 — 승인이 언제 어디에 적용됐는지
-  appliedAtTick: number;        // 실제 확률 평가에 참여 시작 틱
-  branchId: string;             // 등록된 분기
-  registrationOrder: number;    // 같은 틱 내 등록 순서
-  requestSnapshotId: string;    // 요청 시점 상태 스냅샷 (늦은 응답 판정 기준)
+  appliedAtTick: number; // 실제 확률 평가에 참여 시작 틱
+  branchId: string; // 등록된 분기
+  registrationOrder: number; // 같은 틱 내 등록 순서
+  requestSnapshotId: string; // 요청 시점 상태 스냅샷 (늦은 응답 판정 기준)
 }
 ```
 
@@ -1494,11 +1500,11 @@ L1 데이터 오버레이 (최대 2): 식량 생산성, 물 공급, 인구 밀�
 
 ### 색 유형 규칙 (의미 반전 방지)
 
-| 레이어 성격 | 색 유형 | 예시 |
-|---|---|---|
-| 위험·부족 (높을수록 나쁨) | **발산형** (안전→위험) | 식량 부족, 질병, 안정도(역) |
-| 양적·풍요 (높을수록 좋음) | **순차형** (단색 그라데이션) | 식량 생산성, 물 공급 |
-| 환경 (범주) | 범주형 팔레트 | 바이옴 |
+| 레이어 성격               | 색 유형                      | 예시                        |
+| ------------------------- | ---------------------------- | --------------------------- |
+| 위험·부족 (높을수록 나쁨) | **발산형** (안전→위험)       | 식량 부족, 질병, 안정도(역) |
+| 양적·풍요 (높을수록 좋음) | **순차형** (단색 그라데이션) | 식량 생산성, 물 공급        |
+| 환경 (범주)               | 범주형 팔레트                | 바이옴                      |
 
 - 모든 팔레트는 **색약 안전(Viridis/Cividis 계열)** — §27.8 접근성 전제
 - 주제 레이어(L1)마다 단위·범위·기준 시점이 있는 범례를 지도 하단에 표시
@@ -1547,27 +1553,27 @@ L1 데이터 오버레이 (최대 2): 식량 생산성, 물 공급, 인구 밀�
 
 **상단 상태 배너** (`systemStatus`, §9.5):
 
-| 코드 | 표시 | 예 |
-|---|---|---|
-| info | 접힌 상태 표시기 | LLM 폴백 모드로 실행 중 |
-| warning | 노란 배너 | 사건 템플릿 X 비활성화됨 (UnknownMetricError) |
-| error | 빨간 배너 + 저장 중단 | 저장 공간 부족 — 스냅샷 정리 필요 |
+| 코드    | 표시                  | 예                                            |
+| ------- | --------------------- | --------------------------------------------- |
+| info    | 접힌 상태 표시기      | LLM 폴백 모드로 실행 중                       |
+| warning | 노란 배너             | 사건 템플릿 X 비활성화됨 (UnknownMetricError) |
+| error   | 빨간 배너 + 저장 중단 | 저장 공간 부족 — 스냅샷 정리 필요             |
 
 **개발용 디버그 패널** (토글): 틱당 소요 시간, 활성 템플릿 수, 격리된 템플릿 목록, 구조화 오류 로그, 시드/버전 요약.
 
 ## 27.2 인터랙션 상태 커버리지 맵
 
-| 기능 | LOADING | EMPTY | ERROR | SUCCESS | PARTIAL |
-|---|---|---|---|---|---|
-| 세계 생성 | 단계별 진행 표시 (`progress`) | — (불가) | 품질 재생성 중 표시 (§28 재생성) | 지도 등장 + 도시 순차 점등 | — |
-| 지도 | 지도 재생성 진행 | 도시 0개(재생성됨) | 렌더 오류 시 재시도 배너 | — | 폐허는 흔적 표시 |
-| 사건 타임라인 | 대량 이력 로드 시 스로틀 표시 | "아직 사건이 없습니다 — 시간을 진행하세요" | — | — | 필터 결과 0건 안내 |
-| 도시 상세(우측 패널) | — (불가) | "도시를 클릭하면 상세가 나타납니다" | — | §27.4 렌더 | 폐허는 §27.5 |
-| 통계 차트(하단 탭) | — | "기록이 없습니다 — 시간을 진행하면 채워집니다" | — | — | 시간축 부분 구간 |
-| 개입 실행 | 적용 중 (짧음) | — (불가) | 적용 실패 배너 + 재시도 | "적용됨 — 다음 틱부터 반영, 원장에 기록됨" (§27.6) | — |
-| 저장 | 저장 중 (수동 버튼) | 저장된 세계 없음: "새 세계를 만들어보세요" | 버전 불일치 대화상자 (§28.6) | 마지막 저장 시각 라벨 갱신 | — |
-| LLM 추천 패널 | 요청 중 표시 | "LLM 키 미설정 — 설정에서 입력" | §22 폴백 안내 | 후보 등록 확인 (승인 후) | 후보 0건: "지금 상태엔 제안이 없음" |
-| 분기 비교 | 두 분기 로드 중 | "비교할 다른 분기가 없습니다 — 과거 시점에서 분기를 만들어보세요" | — | 차이 수치 표시 | 부분 구간만 겹칠 때 안내 |
+| 기능                 | LOADING                       | EMPTY                                                             | ERROR                            | SUCCESS                                            | PARTIAL                             |
+| -------------------- | ----------------------------- | ----------------------------------------------------------------- | -------------------------------- | -------------------------------------------------- | ----------------------------------- |
+| 세계 생성            | 단계별 진행 표시 (`progress`) | — (불가)                                                          | 품질 재생성 중 표시 (§28 재생성) | 지도 등장 + 도시 순차 점등                         | —                                   |
+| 지도                 | 지도 재생성 진행              | 도시 0개(재생성됨)                                                | 렌더 오류 시 재시도 배너         | —                                                  | 폐허는 흔적 표시                    |
+| 사건 타임라인        | 대량 이력 로드 시 스로틀 표시 | "아직 사건이 없습니다 — 시간을 진행하세요"                        | —                                | —                                                  | 필터 결과 0건 안내                  |
+| 도시 상세(우측 패널) | — (불가)                      | "도시를 클릭하면 상세가 나타납니다"                               | —                                | §27.4 렌더                                         | 폐허는 §27.5                        |
+| 통계 차트(하단 탭)   | —                             | "기록이 없습니다 — 시간을 진행하면 채워집니다"                    | —                                | —                                                  | 시간축 부분 구간                    |
+| 개입 실행            | 적용 중 (짧음)                | — (불가)                                                          | 적용 실패 배너 + 재시도          | "적용됨 — 다음 틱부터 반영, 원장에 기록됨" (§27.6) | —                                   |
+| 저장                 | 저장 중 (수동 버튼)           | 저장된 세계 없음: "새 세계를 만들어보세요"                        | 버전 불일치 대화상자 (§28.6)     | 마지막 저장 시각 라벨 갱신                         | —                                   |
+| LLM 추천 패널        | 요청 중 표시                  | "LLM 키 미설정 — 설정에서 입력"                                   | §22 폴백 안내                    | 후보 등록 확인 (승인 후)                           | 후보 0건: "지금 상태엔 제안이 없음" |
+| 분기 비교            | 두 분기 로드 중               | "비교할 다른 분기가 없습니다 — 과거 시점에서 분기를 만들어보세요" | —                                | 차이 수치 표시                                     | 부분 구간만 겹칠 때 안내            |
 
 - "—"는 **원천 불가능**, 별도 표기 없는 칸은 **미정(TODO)**으로 구분한다
 - **배너 스태킹 규칙**: 동시 다발 시 심각도순(error→warning→info) 최대 3개 노출, 나머지는 "외 N건" 집계 배지로 접기
@@ -1761,21 +1767,21 @@ interface SimulationBranch {
 
 ### 초기 버전
 
-| 영역 | 기술 |
-|---|---|
-| 언어 | TypeScript |
-| 프레임워크 | Next.js |
-| UI | shadcn/ui + Tailwind CSS (신규 UI 라이브러리 추가 금지) |
-| 아이콘 | Lucide |
-| 폰트 | Pretendard + Inter (DESIGN.md 참조) |
-| 렌더링 | Canvas 2D |
-| 상태 관리 | Zustand |
-| 시뮬레이션 | Web Worker |
-| 로컬 저장 | IndexedDB |
-| 스키마 검증 | Zod |
-| 단위 테스트 | Vitest |
-| E2E 테스트 | Playwright |
-| 배포 | Cloudflare Pages 또는 Vercel |
+| 영역        | 기술                                                    |
+| ----------- | ------------------------------------------------------- |
+| 언어        | TypeScript                                              |
+| 프레임워크  | Next.js                                                 |
+| UI          | shadcn/ui + Tailwind CSS (신규 UI 라이브러리 추가 금지) |
+| 아이콘      | Lucide                                                  |
+| 폰트        | Pretendard + Inter (DESIGN.md 참조)                     |
+| 렌더링      | Canvas 2D                                               |
+| 상태 관리   | Zustand                                                 |
+| 시뮬레이션  | Web Worker                                              |
+| 로컬 저장   | IndexedDB                                               |
+| 스키마 검증 | Zod                                                     |
+| 단위 테스트 | Vitest                                                  |
+| E2E 테스트  | Playwright                                              |
+| 배포        | Cloudflare Pages 또는 Vercel                            |
 
 > UI는 `docs/DESIGN.md`(2026-09-17 확정)를 소스 오브 트루스로 따른다 — 차가운 회백 배경·흰 패널·블루 주 강조(위험만 주황/빨강)·본문 14px 최소·일관된 지도 마커 규칙·소형 화면 우측 상세 Sheet 전환.
 
@@ -2748,27 +2754,27 @@ Step 2
 
 ## Error & Rescue Registry
 
-| CODEPATH | 실패 | 예외/상태 | 구조? | 조치 | 사용자 노출 |
-|---|---|---|---|---|---|
-| LLM 호출 | 타임아웃/429/JSON/스키마/거부 | 각 §22 | Y | 내장 템플릿 폴백 | 배너 "LLM 폴백 모드" |
-| 월드젠 | 육지 비율 퇴화 | 품질검증 실패 | Y | 파생 시드 재생성 ≤5회 | 재생성 중 표시 |
-| 이벤트 평가 | 알 수 없는 메트릭 | UnknownMetricError | Y | 템플릿 격리 | 배너 경고 |
-| 이벤트 등록 | 스키마·범위 위반 | InvalidTemplateError | Y | 등록 거부 | 배너 경고 |
-| 틱 수치 | NaN/Infinity | 수치 불변식 | Y | 분모 검사·clamp | 디버그 패널 |
-| IndexedDB 저장 | 용량 초과 | SnapshotQuotaError | Y | 정리→재시도→중단 | 빨간 배너 |
-| 세계 로드 | 손상/버전 불일치 | SnapshotCorruptError | Y | 로드 거부 | 대화상자 |
-| LLM 늦은 응답 | 스냅샷 불일치 | 요청 만료 | Y | 폐기+재요청 | 요청 중 표시 유지 |
+| CODEPATH       | 실패                          | 예외/상태            | 구조? | 조치                  | 사용자 노출          |
+| -------------- | ----------------------------- | -------------------- | ----- | --------------------- | -------------------- |
+| LLM 호출       | 타임아웃/429/JSON/스키마/거부 | 각 §22               | Y     | 내장 템플릿 폴백      | 배너 "LLM 폴백 모드" |
+| 월드젠         | 육지 비율 퇴화                | 품질검증 실패        | Y     | 파생 시드 재생성 ≤5회 | 재생성 중 표시       |
+| 이벤트 평가    | 알 수 없는 메트릭             | UnknownMetricError   | Y     | 템플릿 격리           | 배너 경고            |
+| 이벤트 등록    | 스키마·범위 위반              | InvalidTemplateError | Y     | 등록 거부             | 배너 경고            |
+| 틱 수치        | NaN/Infinity                  | 수치 불변식          | Y     | 분모 검사·clamp       | 디버그 패널          |
+| IndexedDB 저장 | 용량 초과                     | SnapshotQuotaError   | Y     | 정리→재시도→중단      | 빨간 배너            |
+| 세계 로드      | 손상/버전 불일치              | SnapshotCorruptError | Y     | 로드 거부             | 대화상자             |
+| LLM 늦은 응답  | 스냅샷 불일치                 | 요청 만료            | Y     | 폐기+재요청           | 요청 중 표시 유지    |
 
 ## Failure Modes Registry
 
-| CODEPATH | FAILURE MODE | RESCUED? | TEST? | USER SEES? | LOGGED? |
-|---|---|---|---|---|---|
-| 확률 판정 | 배속 따라 결과 상이 | Y(설계) | Y(§33) | — | Y |
-| 효과 적용 | 복리 누적·미원복 | Y(§12.2.1) | Y(§33) | — | Y |
-| 정산 | 교역·기아 같은 달 충돌 | Y(§9.4) | Y(§33) | — | Y |
-| 원장 | 이중 귀속 | Y(§8.3) | Y(§33) | — | Y |
-| 저장 | 지도 포함 630MB | Y(§28.3) | Y | — | Y |
-| UI 통지 | 최대속도 폭주 | Y(§9.5) | Y(§33) | — | Y |
+| CODEPATH  | FAILURE MODE           | RESCUED?   | TEST?  | USER SEES? | LOGGED? |
+| --------- | ---------------------- | ---------- | ------ | ---------- | ------- |
+| 확률 판정 | 배속 따라 결과 상이    | Y(설계)    | Y(§33) | —          | Y       |
+| 효과 적용 | 복리 누적·미원복       | Y(§12.2.1) | Y(§33) | —          | Y       |
+| 정산      | 교역·기아 같은 달 충돌 | Y(§9.4)    | Y(§33) | —          | Y       |
+| 원장      | 이중 귀속              | Y(§8.3)    | Y(§33) | —          | Y       |
+| 저장      | 지도 포함 630MB        | Y(§28.3)   | Y      | —          | Y       |
+| UI 통지   | 최대속도 폭주          | Y(§9.5)    | Y(§33) | —          | Y       |
 
 **CRITICAL GAP: 0** — 전 행 구조·테스트·노출 정의 완료.
 
@@ -2885,20 +2891,21 @@ Step 2
 
 ## GSTACK REVIEW REPORT
 
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | resolved | mode: HOLD_SCOPE, 0 critical gaps, 18 findings all approved |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | resolved | 9 issues (5 native + 4 outside), all approved and incorporated |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 | resolved | score: 6/10 → 8/10, 12 decisions made (11 applied, 1 → /design-consultation) |
-| Outside Review (CEO) | codex (auto, plan phase) | Independent 2nd opinion | 1 | completed | 6 complementary findings, all approved |
-| Outside Review (Eng) | codex (auto, plan phase) | Independent 2nd opinion | 1 | unavailable | 4 substantive findings surfaced, all approved |
-| Design Outside Voices | codex + claude subagent | Design hard rules + completeness | 1 | completed | 0 hard rejections; 7+18 findings merged into 12 decisions |
-| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | Not run |
+| Review                | Trigger                  | Why                              | Runs | Status      | Findings                                                                     |
+| --------------------- | ------------------------ | -------------------------------- | ---- | ----------- | ---------------------------------------------------------------------------- |
+| CEO Review            | `/plan-ceo-review`       | Scope & strategy                 | 1    | resolved    | mode: HOLD_SCOPE, 0 critical gaps, 18 findings all approved                  |
+| Eng Review            | `/plan-eng-review`       | Architecture & tests (required)  | 1    | resolved    | 9 issues (5 native + 4 outside), all approved and incorporated               |
+| Design Review         | `/plan-design-review`    | UI/UX gaps                       | 1    | resolved    | score: 6/10 → 8/10, 12 decisions made (11 applied, 1 → /design-consultation) |
+| Outside Review (CEO)  | codex (auto, plan phase) | Independent 2nd opinion          | 1    | completed   | 6 complementary findings, all approved                                       |
+| Outside Review (Eng)  | codex (auto, plan phase) | Independent 2nd opinion          | 1    | unavailable | 4 substantive findings surfaced, all approved                                |
+| Design Outside Voices | codex + claude subagent  | Design hard rules + completeness | 1    | completed   | 0 hard rejections; 7+18 findings merged into 12 decisions                    |
+| DX Review             | `/plan-devex-review`     | Developer experience gaps        | 0    | —           | Not run                                                                      |
 
 - **OUTSIDE COVERAGE:** provider=codex (gpt-6-astra), phases=plan-review(2)/design(1). All runs substantive; eng-phase run recorded unavailable (marker format). Design phase completed with litmus scorecard.
 - **CROSS-MODEL:** native + external reviewers aligned in every phase — no conflicting findings. Design phase: both flagged right-panel hierarchy and map-first layout as the load-bearing fixes.
 - **VERDICT:** CEO + ENG + DESIGN CLEARED — plan is implementation-ready pending design tokens (/design-consultation, user-selected deferral).
 
 **UNRESOLVED DECISIONS:** (모두 해소 — 2026-09-17)
+
 - ~~디자인 토큰 세트(CSS 변수·폰트·숫자/시간 포맷)~~ — 해소: `docs/DESIGN.md`로 디자인 시스템 확정 (/design-consultation 완료)
 - ~~§35 우선순위 표의 관찰 가능성 4위 재정렬 여부~~ — 해소: 현행 유지 확정(제품 가치는 §2 담당, §35는 엔지니어링 제약 순서)

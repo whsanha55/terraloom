@@ -16,14 +16,7 @@ export function cellCoords(index: number, width: number): Cell {
 }
 
 export function isInBounds(x: number, y: number, width: number, height: number): boolean {
-  return (
-    Number.isInteger(x) &&
-    Number.isInteger(y) &&
-    x >= 0 &&
-    y >= 0 &&
-    x < width &&
-    y < height
-  );
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < width && y < height;
 }
 
 export function assertInBounds(x: number, y: number, width: number, height: number): void {
