@@ -1,12 +1,20 @@
 "use client";
 
 import { Dices } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { generateClimate } from "@/world/generation/climate";
 import { computeLandRatio } from "@/world/generation/elevation";
 import { generateWorld, type WorldGenResult } from "@/world/generation/generator";
-import { renderElevationRGBA } from "@/world/rendering/elevationRender";
+import { CellInspector } from "./CellInspector";
+import { MapCanvas, type MapLayer } from "./MapCanvas";
 
 const RESOLUTIONS = [256, 512] as const;
+const LAYERS: Array<{ id: MapLayer; label: string }> = [
+  { id: "elevation", label: "고도" },
+  { id: "temperature", label: "온도" },
+  { id: "moisture", label: "습도" },
+  { id: "biome", label: "바이옴" },
+];
 
 /** 시드 자체는 결정론 대상이 아니므로 crypto로 생성한다(Math.random 미사용) */
 function randomSeed(): string {
@@ -23,34 +31,26 @@ export function GeneratorPanel() {
   const [seed, setSeed] = useState("");
   const [resolution, setResolution] = useState<number>(256);
   const [seaLevel, setSeaLevel] = useState(0.5);
+  const [layer, setLayer] = useState<MapLayer>("elevation");
+  const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
   const [world, setWorld] = useState<GenerationState | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const generate = useCallback(() => {
     const effectiveSeed = seed.trim() === "" ? randomSeed() : seed.trim();
     const result = generateWorld({ seed: effectiveSeed, resolution, cityRadius: 3 });
     setWorld({ ...result, seed: effectiveSeed });
+    setSelectedCell(null);
     if (seed.trim() === "") setSeed(effectiveSeed); // 자동 생성 시드 표시
   }, [seed, resolution]);
 
-  // 지도 렌더링 — 결과 또는 해수면 변경 시 즉시 재판정(Step 2 완료 조건)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !world) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const rgba = renderElevationRGBA(
-      world.map.elevation,
-      world.map.width,
-      world.map.height,
-      seaLevel,
-    );
-    canvas.width = world.map.width;
-    canvas.height = world.map.height;
-    const imageData = ctx.createImageData(world.map.width, world.map.height);
-    imageData.data.set(rgba);
-    ctx.putImageData(imageData, 0, 0);
-  }, [world, seaLevel]);
+  // 해수면 변경 → 기후·바이옴 즉시 재계산(고도 불변, 결정론 유지)
+  const handleSeaLevelChange = (value: number) => {
+    setSeaLevel(value);
+    if (world) {
+      generateClimate(world.map, { seed: world.seed, resolution, cityRadius: 3 }, value);
+      setWorld({ ...world }); // map은 제자리 갱신 — 새 참조로 재렌더 트리거
+    }
+  };
 
   const landRatio = world ? computeLandRatio(world.map.elevation, seaLevel) : null;
 
@@ -109,37 +109,63 @@ export function GeneratorPanel() {
           max={0.95}
           step={0.01}
           value={seaLevel}
-          onChange={(e) => setSeaLevel(Number(e.target.value))}
+          onChange={(e) => handleSeaLevelChange(Number(e.target.value))}
           className="mt-xs w-full accent-primary"
         />
       </label>
 
       {world ? (
         <>
-          <p
-            className="mt-lg flex flex-wrap items-center gap-x-md gap-y-xs text-text-muted"
-            data-testid="world-stats"
-          >
-            <span>
-              육지{" "}
-              <span data-testid="land-ratio" className="font-numeric tnum font-medium text-text">
-                {Math.round((landRatio ?? 0) * 100)}%
+          <div className="mt-lg flex flex-wrap items-center gap-md">
+            <p className="flex flex-wrap items-center gap-x-md gap-y-xs text-text-muted">
+              <span>
+                육지{" "}
+                <span data-testid="land-ratio" className="font-numeric tnum font-medium text-text">
+                  {Math.round((landRatio ?? 0) * 100)}%
+                </span>
               </span>
-            </span>
-            <span className="font-numeric tnum">
-              시도 {world.attempts}/5{world.attempts > 1 ? " (재구성)" : ""}
-            </span>
-            {world.seaLevelCompensated && (
-              <span className="rounded-full bg-[#FFF7ED] px-sm py-1 font-medium text-warning">
-                해수면 보정됨
+              <span className="font-numeric tnum">
+                시도 {world.attempts}/5{world.attempts > 1 ? " (재구성)" : ""}
               </span>
-            )}
-          </p>
-          <canvas
-            ref={canvasRef}
-            aria-label="고도 지도"
-            className="mt-md w-full rounded-md border border-border [image-rendering:pixelated]"
+              {world.seaLevelCompensated && (
+                <span className="rounded-full bg-[#FFF7ED] px-sm py-1 font-medium text-warning">
+                  해수면 보정됨
+                </span>
+              )}
+            </p>
+            <div
+              role="group"
+              aria-label="지도 레이어"
+              className="ml-auto flex overflow-hidden rounded-md border border-border"
+            >
+              {LAYERS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={layer === item.id}
+                  onClick={() => setLayer(item.id)}
+                  className={
+                    layer === item.id
+                      ? "bg-primary px-md py-xs font-medium text-on-primary"
+                      : "px-md py-xs text-text-muted hover:bg-accent hover:text-text"
+                  }
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <MapCanvas
+            map={world.map}
+            seaLevel={seaLevel}
+            layer={layer}
+            onSelectCell={setSelectedCell}
           />
+
+          {selectedCell && (
+            <CellInspector map={world.map} cell={selectedCell} seaLevel={seaLevel} />
+          )}
         </>
       ) : (
         <p className="mt-lg text-text-muted">

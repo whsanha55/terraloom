@@ -16,6 +16,7 @@ import {
   generateElevationField,
   type ElevationParams,
 } from "./elevation";
+import { generateClimate, type ClimateParams } from "./climate";
 import { isLandRatioAcceptable } from "./validate";
 
 export const MAX_GENERATION_ATTEMPTS = 5;
@@ -36,6 +37,7 @@ export interface WorldGenResult {
 export interface GenerateWorldOptions {
   seaLevel?: number;
   params?: ElevationParams;
+  climateParams?: ClimateParams;
 }
 
 export function generateWorld(
@@ -51,7 +53,7 @@ export function generateWorld(
     const field = generateElevationField(config, attempt, params);
     const ratio = computeLandRatio(field, seaLevel);
     if (isLandRatioAcceptable(ratio)) {
-      map.elevation.set(field);
+      finalizeWorld(map, config, field, seaLevel, options.climateParams);
       return {
         map,
         attempts: attempt + 1,
@@ -72,7 +74,7 @@ export function generateWorld(
 
   const field = best!.field;
   const compensated = seaLevelForLandRatio(field, FALLBACK_TARGET_LAND_RATIO);
-  map.elevation.set(field);
+  finalizeWorld(map, config, field, compensated, options.climateParams);
   return {
     map,
     attempts: MAX_GENERATION_ATTEMPTS,
@@ -81,6 +83,18 @@ export function generateWorld(
     seaLevelCompensated: true,
     generatorVersion: GENERATOR_VERSION,
   };
+}
+
+/** 고도 확정 후 기후·바이옴 레이어를 채운다 */
+function finalizeWorld(
+  map: WorldMap,
+  config: WorldConfig,
+  elevation: Float32Array,
+  seaLevel: number,
+  climateParams?: ClimateParams,
+): void {
+  map.elevation.set(elevation);
+  generateClimate(map, config, seaLevel, climateParams);
 }
 
 /** 고도장에서 목표 육지 비율을 만드는 해수면 (히스토그램 분위수, 결정론적) */
