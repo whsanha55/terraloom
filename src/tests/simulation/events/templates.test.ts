@@ -12,6 +12,7 @@ const EXPECTED_IDS = [
   "epidemic",
   "foodRiot",
   "massMigration",
+  "priceRise",
   "routeDisruption",
 ];
 
@@ -42,8 +43,8 @@ function baseTemplate(overrides: Partial<EventTemplate> = {}): EventTemplate {
   };
 }
 
-describe("내장 이벤트 템플릿 8종 (Step 8)", () => {
-  it("Step 8 내장 이벤트가 모두 등록되어 있다", () => {
+describe("내장 이벤트 템플릿 (Step 8 + Step 9)", () => {
+  it("내장 이벤트가 모두 등록되어 있다", () => {
     const ids = BUILTIN_TEMPLATES.map((t) => t.id).sort();
     expect(ids).toEqual([...EXPECTED_IDS].sort());
   });

@@ -35,6 +35,11 @@ export class SimulationEngine {
     clock.year = Math.floor(clock.currentTick / TICKS_PER_YEAR);
     clock.month = clock.currentTick % TICKS_PER_YEAR;
 
+    // 2. 예정된 이벤트 활성화 (§9.3.2 — 연쇄 후보 판정, Step 9)
+    this.eventEngine.activateScheduled(this.state);
+    const activationEvaluations = [...this.eventEngine.lastTickEvaluations];
+    const activationNotices = [...this.eventEngine.lastTickNotices];
+
     const registry = this.eventEngine.registry;
     const multiplier = (targetId: string, metric: string): number =>
       ongoingMultiplier(registry, this.state.activeEvents, targetId, metric);
@@ -50,6 +55,15 @@ export class SimulationEngine {
     });
 
     this.eventEngine.run(this.state);
+    // 활성화(연쇄) 단계와 평가 단계의 관측 결과를 합친다 — run()이 리스트를 초기화하므로
+    this.eventEngine.lastTickEvaluations = [
+      ...activationEvaluations,
+      ...this.eventEngine.lastTickEvaluations,
+    ];
+    this.eventEngine.lastTickNotices = [
+      ...activationNotices,
+      ...this.eventEngine.lastTickNotices,
+    ];
     this.lastTickNotices = this.eventEngine.lastTickNotices;
 
     // 15. 통계 집계

@@ -5,6 +5,7 @@
  * 잘못된 템플릿이 엔진에 들어오지 못하게 한다.
  */
 import { InvalidTemplateError } from "../../errors";
+import { MAX_FOLLOW_UP_CANDIDATES } from "../engine";
 import { KNOWN_METRICS } from "../metrics";
 import type { EventCondition, EventEffect, EventTemplate } from "../types";
 
@@ -88,7 +89,19 @@ export function validateTemplate(template: EventTemplate): void {
   for (const effect of template.immediateEffects) checkEffect(template, effect);
   for (const effect of template.ongoingEffects) checkEffect(template, effect);
   for (const effect of template.resolutionEffects) checkEffect(template, effect);
+  if (template.followUpCandidates.length > MAX_FOLLOW_UP_CANDIDATES) {
+    throw new InvalidTemplateError(
+      template.id,
+      `후속 후보는 최대 ${MAX_FOLLOW_UP_CANDIDATES}개입니다 (§14.1)`,
+    );
+  }
   for (const followUp of template.followUpCandidates) {
+    if (!followUp.eventTemplateId || followUp.eventTemplateId.length === 0) {
+      throw new InvalidTemplateError(template.id, "후속 후보 템플릿 id가 비었습니다");
+    }
+    if (!Number.isFinite(followUp.baseWeight) || followUp.baseWeight <= 0) {
+      throw new InvalidTemplateError(template.id, `후속 후보 가중치 위반: ${followUp.baseWeight}`);
+    }
     if (followUp.minimumDelayTicks < 0 || followUp.minimumDelayTicks > followUp.maximumDelayTicks) {
       throw new InvalidTemplateError(template.id, `후속 지연 범위 위반: ${followUp.eventTemplateId}`);
     }

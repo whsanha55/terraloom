@@ -135,6 +135,8 @@ export interface ScheduledWorldEvent {
   baseWeight: number;
   chainDepth: number;
   causedByEventId: string;
+  /** 연쇄 후보 고유 조건 — 매 틱 재확인, 개선되면 미발생 (§14) */
+  conditions: EventCondition[];
 }
 
 /** §13.1 — 확률 계산 근거 보존 (UI·디버깅) */

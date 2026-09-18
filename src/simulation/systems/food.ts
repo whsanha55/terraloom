@@ -139,6 +139,12 @@ export function runFoodSettlement(state: WorldState, options: FoodSystemOptions 
       FOOD_MONTHS_REMAINING_CAP,
       safeDiv(settlement.foodStock, Math.max(demand, 1), FOOD_MONTHS_REMAINING_CAP),
     );
+    // 식량 가격 지수 — 희소성(미충족·재고 부족)의 통화 표현. 가격 상승 통지(§12.4)의 입력
+    const scarcity = Math.max(
+      settlement.unmetRatio,
+      Math.max(0, 1 - safeDiv(settlement.foodMonthsRemaining, 2, 0)) * 0.5,
+    );
+    settlement.foodPriceIndex = clamp(1 + 2 * scarcity, 1, 3);
   }
 
   // 폐허 도시 — 명시적 초기화 (오염 방지)

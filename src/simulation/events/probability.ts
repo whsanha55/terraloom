@@ -54,9 +54,14 @@ function eventRng(state: WorldState, purpose: string, templateId: string, target
   );
 }
 
-/** 결정론적 확률 판정용 난수 [0,1) */
-export function rollEvent(state: WorldState, templateId: string, targetId: string): number {
-  return eventRng(state, "roll", templateId, targetId).next();
+/** 결정론적 확률 판정용 난수 [0,1) — purpose로 자연/연쇄 판정을 구분한다 */
+export function rollEvent(
+  state: WorldState,
+  templateId: string,
+  targetId: string,
+  purpose = "roll",
+): number {
+  return eventRng(state, purpose, templateId, targetId).next();
 }
 
 /** 지속 기간 결정론 롤 — [minTicks, maxTicks] */

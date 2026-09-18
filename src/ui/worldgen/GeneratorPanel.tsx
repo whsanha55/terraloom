@@ -237,7 +237,12 @@ export function GeneratorPanel() {
                     <span className="font-numeric tnum text-text-muted">
                       {Math.floor(event.startedTick / 12) + 1}년 {(event.startedTick % 12) + 1}월
                     </span>
-                    <span className="text-text">{event.name}</span>
+                    <span className="text-text">
+                      {event.name}
+                      {event.causedByName ? (
+                        <span className="text-text-muted"> ← {event.causedByName}</span>
+                      ) : null}
+                    </span>
                     <span className="text-text-muted">{event.targetName}</span>
                     <span className="font-numeric tnum ml-auto text-text-muted">
                       중요도 {event.importance}

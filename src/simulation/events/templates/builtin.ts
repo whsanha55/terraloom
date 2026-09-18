@@ -1,9 +1,10 @@
 /**
- * 내장 이벤트 템플릿 8종 (Step 8).
+ * 내장 이벤트 템플릿 (Step 8 8종 + Step 9 식량 가격 상승 통지형).
  *
  * 가뭄·홍수·풍년·흉년·전염병·식량 폭동(효과형) +
- * 대규모 이주(통지형) + 교역로 단절(효과형·루트 스코프).
+ * 대규모 이주·식량 가격 상승(통지형) + 교역로 단절(효과형·루트 스코프).
  * 수치는 §33 평상시 밸런스 시나리오가 통과하도록 조율됐다.
+ * Step 9: 후속 후보가 연쇄 시나리오(가뭄→흉년→가격 상승→폭동→이주)를 구성한다.
  */
 import type { EventTemplate } from "../types";
 
@@ -34,12 +35,27 @@ export const BUILTIN_TEMPLATES: EventTemplate[] = [
       { targetMetric: "settlement.foodProduction", operation: "multiply", value: 0.55, minimum: 0 },
     ],
     resolutionEffects: [],
-    followUpCandidates: [],
     cooldownTicks: 36,
     maximumConcurrentInstances: 1,
     importance: 80,
     tags: ["natural", "food"],
     source: "builtin",
+    followUpCandidates: [
+      {
+        eventTemplateId: "badHarvest",
+        minimumDelayTicks: 2,
+        maximumDelayTicks: 8,
+        baseWeight: 8.0,
+        conditions: [],
+      },
+      {
+        eventTemplateId: "massMigration",
+        minimumDelayTicks: 6,
+        maximumDelayTicks: 24,
+        baseWeight: 1.5,
+        conditions: [{ metric: "settlement.foodMonthsRemaining", operator: "lt", value: 1.5 }],
+      },
+    ],
   },
   {
     id: "flood",
@@ -69,12 +85,27 @@ export const BUILTIN_TEMPLATES: EventTemplate[] = [
       { targetMetric: "settlement.foodProduction", operation: "multiply", value: 0.85, minimum: 0 },
     ],
     resolutionEffects: [],
-    followUpCandidates: [],
     cooldownTicks: 18,
     maximumConcurrentInstances: 1,
     importance: 60,
     tags: ["natural", "food"],
     source: "builtin",
+    followUpCandidates: [
+      {
+        eventTemplateId: "routeDisruption",
+        minimumDelayTicks: 1,
+        maximumDelayTicks: 6,
+        baseWeight: 6.0,
+        conditions: [],
+      },
+      {
+        eventTemplateId: "badHarvest",
+        minimumDelayTicks: 1,
+        maximumDelayTicks: 4,
+        baseWeight: 1.5,
+        conditions: [],
+      },
+    ],
   },
   {
     id: "goodHarvest",
@@ -134,12 +165,34 @@ export const BUILTIN_TEMPLATES: EventTemplate[] = [
       { targetMetric: "settlement.foodProduction", operation: "multiply", value: 0.6, minimum: 0 },
     ],
     resolutionEffects: [],
-    followUpCandidates: [],
     cooldownTicks: 12,
     maximumConcurrentInstances: 1,
     importance: 50,
     tags: ["natural", "food"],
     source: "builtin",
+    followUpCandidates: [
+      {
+        eventTemplateId: "priceRise",
+        minimumDelayTicks: 1,
+        maximumDelayTicks: 4,
+        baseWeight: 1,
+        conditions: [],
+      },
+      {
+        eventTemplateId: "foodRiot",
+        minimumDelayTicks: 2,
+        maximumDelayTicks: 10,
+        baseWeight: 2.5,
+        conditions: [{ metric: "settlement.foodMonthsRemaining", operator: "lt", value: 2 }],
+      },
+      {
+        eventTemplateId: "massMigration",
+        minimumDelayTicks: 4,
+        maximumDelayTicks: 16,
+        baseWeight: 1.2,
+        conditions: [{ metric: "settlement.foodMonthsRemaining", operator: "lt", value: 1.5 }],
+      },
+    ],
   },
   {
     id: "epidemic",
@@ -219,12 +272,20 @@ export const BUILTIN_TEMPLATES: EventTemplate[] = [
       { targetMetric: "settlement.stability", operation: "multiply", value: 0.75, minimum: 0, maximum: 100 },
     ],
     resolutionEffects: [],
-    followUpCandidates: [],
     cooldownTicks: 12,
     maximumConcurrentInstances: 1,
     importance: 70,
     tags: ["social", "food"],
     source: "builtin",
+    followUpCandidates: [
+      {
+        eventTemplateId: "massMigration",
+        minimumDelayTicks: 1,
+        maximumDelayTicks: 6,
+        baseWeight: 2.0,
+        conditions: [{ metric: "settlement.stability", operator: "lt", value: 45 }],
+      },
+    ],
   },
   {
     id: "massMigration",
@@ -248,6 +309,28 @@ export const BUILTIN_TEMPLATES: EventTemplate[] = [
     maximumConcurrentInstances: 1,
     importance: 65,
     tags: ["social", "migration"],
+    source: "builtin",
+  },
+  {
+    id: "priceRise",
+    version: 1,
+    category: "economic",
+    kind: "notification",
+    name: "식량 가격 상승",
+    descriptionTemplate: "{settlement}의 곡물 값이 폭등하고 있다.",
+    scope: "settlement",
+    preconditions: [{ metric: "settlement.foodPriceIndex", operator: "gte", value: 1.6 }],
+    // 통지형 — 가격 지수(기본 계산)가 임계값을 넘으면 기록만 남긴다 (§12.4)
+    probability: { base: 1, factors: [] },
+    duration: { minTicks: 0, maxTicks: 0 },
+    immediateEffects: [],
+    ongoingEffects: [],
+    resolutionEffects: [],
+    followUpCandidates: [],
+    cooldownTicks: 12,
+    maximumConcurrentInstances: 1,
+    importance: 45,
+    tags: ["economic", "food"],
     source: "builtin",
   },
   {
