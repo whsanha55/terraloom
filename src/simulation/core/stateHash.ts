@@ -25,6 +25,7 @@ export function computeStateHash(state: WorldState): string {
     state.seed,
     state.simulationVersion,
     state.generatorVersion,
+    `branch:${state.branchId}`,
     `tick:${state.clock.currentTick}`,
   ];
 

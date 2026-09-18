@@ -20,6 +20,7 @@ export interface SerializedDynamicState {
   simulationVersion: string;
   generatorVersion: string;
   seed: string;
+  branchId?: string; // 기본 "main" (이전 스냅숏 호환)
   clock: {
     currentTick: number;
     year: number;
@@ -32,6 +33,7 @@ export interface SerializedDynamicState {
   eventHistory: WorldState["eventHistory"];
   eventCooldowns: WorldState["eventCooldowns"];
   probabilityEvaluations: WorldState["probabilityEvaluations"];
+  llmTemplates: WorldState["llmTemplates"];
   globalStatistics: WorldState["globalStatistics"];
   llmRecords: WorldState["llmRecords"];
   changeLedger: SerializedLedger;
@@ -42,6 +44,7 @@ export function serializeDynamicState(state: WorldState): SerializedDynamicState
     simulationVersion: state.simulationVersion,
     generatorVersion: state.generatorVersion,
     seed: state.seed,
+    branchId: state.branchId,
     clock: {
       currentTick: state.clock.currentTick,
       year: state.clock.year,
@@ -54,6 +57,7 @@ export function serializeDynamicState(state: WorldState): SerializedDynamicState
     eventHistory: structuredClone(state.eventHistory),
     eventCooldowns: structuredClone(state.eventCooldowns),
     probabilityEvaluations: structuredClone(state.probabilityEvaluations),
+    llmTemplates: structuredClone(state.llmTemplates),
     globalStatistics: structuredClone(state.globalStatistics),
     llmRecords: structuredClone(state.llmRecords),
     changeLedger: { entries: [...state.changeLedger.all()] },
@@ -82,6 +86,7 @@ export function deserializeDynamicState(
     seed: data.seed,
     generatorVersion: data.generatorVersion,
     simulationVersion: data.simulationVersion,
+    branchId: data.branchId ?? "main",
     clock: {
       currentTick: data.clock.currentTick,
       year: data.clock.year,
@@ -98,6 +103,7 @@ export function deserializeDynamicState(
     eventHistory: structuredClone(data.eventHistory),
     eventCooldowns: structuredClone(data.eventCooldowns),
     probabilityEvaluations: structuredClone(data.probabilityEvaluations),
+    llmTemplates: structuredClone(data.llmTemplates ?? []),
     globalStatistics: structuredClone(data.globalStatistics),
     llmRecords: structuredClone(data.llmRecords),
     changeLedger: ledger,

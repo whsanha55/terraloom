@@ -141,6 +141,7 @@ export function registerLLMTemplate(
   }
   try {
     eventEngine.registry.set(payload.template.id, payload.template);
+    state.llmTemplates.push(payload.template); // 스냅숏·복원 대상(§23)
   } catch {
     return { ok: false, reason: "템플릿 등록 실패" };
   }

@@ -20,14 +20,16 @@ import type { WorldState } from "./worldState";
 export const TICKS_PER_YEAR = 12;
 
 export class SimulationEngine {
-  /** 규칙 기반 이벤트 엔진 (Step 8) — 템플릿 레지스트리 소유 */
-  public readonly eventEngine = new EventEngine(BUILTIN_TEMPLATES);
+  /** 규칙 기반 이벤트 엔진 (Step 8) — 내장 + 승인된 LLM 템플릿(§23 재사용) */
+  public readonly eventEngine: EventEngine;
   /** 직전 틱의 이주 흐름 — UI 시각화(이주 경로 화살표)용 */
   public lastMigrationFlows: MigrationFlow[] = [];
   /** 직전 틱에 발생·기록된 사건 — 타임라인·자동 일시 정지 판정용 */
   public lastTickNotices: EventNotice[] = [];
 
-  constructor(public readonly state: WorldState) {}
+  constructor(public readonly state: WorldState) {
+    this.eventEngine = new EventEngine([...BUILTIN_TEMPLATES, ...state.llmTemplates]);
+  }
 
   tick(): void {
     const clock = this.state.clock;

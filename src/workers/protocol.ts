@@ -11,6 +11,7 @@ import type { EventDetailData } from "@/simulation/events/detail";
 import type { EventTemplate } from "@/simulation/events/types";
 import type { LLMInput } from "@/llm/gateway/summary";
 import type { ChainContextInput, ChainScheduledSpec } from "@/llm/gateway/chain";
+import type { BranchComparison, LLMPolicy } from "@/simulation/core/branch";
 import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 
@@ -32,8 +33,11 @@ export type SimRequest =
   | { type: "cityDetail"; settlementId: string } // Step 10 — 도시 상세(원인 분해) 요청
   | { type: "setMajorThreshold"; threshold: number } // Step 10 — 자동 정지 임계(§25)
   | { type: "intervene"; intervention: UserIntervention } // Step 14
-  | { type: "snapshot" } // Step 13
-  | { type: "load"; snapshotId: string } // Step 13
+  | { type: "snapshot"; label?: "user" } // Step 13 — 수동 저장
+  | { type: "listSnapshots" } // Step 13
+  | { type: "restoreSnapshot"; snapshotId: string; llmPolicy: LLMPolicy; asBranch: boolean; name?: string } // Step 13
+  | { type: "compareSnapshots"; snapshotAId: string; snapshotBId: string } // Step 13
+  | { type: "listBranches" } // Step 13
   | { type: "requestLLM"; mode?: "chain"; eventId?: string } // Step 11 세계 추천 / Step 12 연쇄 추천
   | {
       type: "registerLLMTemplate"; // Step 11 — 사용자가 승인한 후보 등록
@@ -168,6 +172,17 @@ export type SimNotification =
       ok: boolean;
       templateId?: string;
       reason?: string;
+    }
+  | { type: "snapshotSaved"; snapshotId: string; tick: number; branchId: string } // Step 13
+  | {
+      type: "snapshotList";
+      snapshots: Array<{ id: string; tick: number; branchId: string; label: string }>;
+    }
+  | { type: "worldRestored"; branchId: string; tick: number } // Step 13 — 복원/분기 전환
+  | { type: "branchComparison"; comparison: BranchComparison }
+  | {
+      type: "branchList";
+      branches: Array<{ id: string; name: string; parentBranchId: string; createdAtTick: number }>;
     }
   | {
       type: "systemStatus";

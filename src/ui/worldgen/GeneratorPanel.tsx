@@ -21,6 +21,8 @@ import { EventTimeline } from "@/ui/timeline/EventTimeline";
 import { EventDetailPanel } from "@/ui/events/EventDetailPanel";
 import { CityDetailPanel, type CitySeriesPoint } from "@/ui/events/CityDetailPanel";
 import { RecommendationPanel, type LLMAutomation } from "@/ui/llm/RecommendationPanel";
+import { SnapshotPanel, type SnapshotEntry } from "@/ui/branches/SnapshotPanel";
+import type { BranchComparison, LLMPolicy } from "@/simulation/core/branch";
 import { MockLLMProvider, OpenAICompatibleProvider } from "@/llm/gateway/provider";
 import {
   requestRecommendations,
@@ -116,6 +118,12 @@ export function GeneratorPanel() {
   const [chainResult, setChainResult] = useState<ChainGatewayResult | null>(null);
   const [chainHash, setChainHash] = useState<string | null>(null);
   const [chainParentName, setChainParentName] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<SnapshotEntry[]>([]);
+  const [llmPolicy, setLlmPolicy] = useState<LLMPolicy>("reuse");
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [comparison, setComparison] = useState<BranchComparison | null>(null);
+  const [compareAId, setCompareAId] = useState("");
+  const [compareBId, setCompareBId] = useState("");
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -248,6 +256,31 @@ export function GeneratorPanel() {
           setApprovedTemplateIds((prev) => new Set([...prev, result.templateId!]));
         }
       },
+      onSnapshotSaved: () => {
+        setLastSavedAt(Date.now());
+        clientRef.current?.listSnapshots();
+      },
+      onSnapshotList: (list) => {
+        setSnapshots(list);
+        setCompareAId((prev) => (prev === "" && list.length > 0 ? list[0]!.id : prev));
+        setCompareBId((prev) => (prev === "" && list.length > 1 ? list[list.length - 1]!.id : prev));
+      },
+      onWorldRestored: (result) => {
+        setEventLog([]);
+        setStats([]);
+        setLiveSettlements({});
+        setMigrations([]);
+        citySeriesRef.current = {};
+        setCitySeries({});
+        setApprovedTemplateIds(new Set());
+        setMajorEvent(null);
+        setPauseReason(null);
+        setLlmStatus("idle");
+        setLlmResult(null);
+        clientRef.current?.listSnapshots();
+        void result;
+      },
+      onBranchComparison: (result) => setComparison(result),
     });
     clientRef.current = client;
     return () => {
@@ -296,6 +329,11 @@ export function GeneratorPanel() {
       setChainHash(null);
       setChainParentName(null);
       lastAutoLLMTickRef.current = -Infinity;
+      setSnapshots([]);
+      setLastSavedAt(null);
+      setComparison(null);
+      setCompareAId("");
+      setCompareBId("");
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -348,6 +386,20 @@ export function GeneratorPanel() {
     setSelectedSettlementId(settlementId);
     setSelectedCell(null);
     clientRef.current?.requestCityDetail(settlementId);
+  };
+
+  const handleSave = () => {
+    clientRef.current?.saveSnapshot();
+  };
+
+  const handleRestore = (snapshotId: string, asBranch: boolean) => {
+    clientRef.current?.restoreSnapshot(snapshotId, { llmPolicy, asBranch });
+  };
+
+  const handleCompare = () => {
+    if (compareAId && compareBId) {
+      clientRef.current?.compareSnapshots(compareAId, compareBId);
+    }
   };
 
   const handleLLMRequest = () => {
@@ -569,6 +621,24 @@ export function GeneratorPanel() {
           </div>
 
           <StatsChart history={stats} />
+
+          <div className="mt-md">
+            <SnapshotPanel
+              snapshots={snapshots}
+              llmPolicy={llmPolicy}
+              onLLMPolicyChange={setLlmPolicy}
+              lastSavedAt={lastSavedAt}
+              onSave={handleSave}
+              onRefresh={() => clientRef.current?.listSnapshots()}
+              onRestore={handleRestore}
+              comparison={comparison}
+              compareAId={compareAId}
+              compareBId={compareBId}
+              onCompareAChange={setCompareAId}
+              onCompareBChange={setCompareBId}
+              onCompare={handleCompare}
+            />
+          </div>
 
           <div className="mt-md">
             <RecommendationPanel

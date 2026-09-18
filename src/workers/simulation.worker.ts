@@ -24,6 +24,9 @@ import {
 import { registerLLMTemplate, registerChainTemplate } from "@/llm/records";
 import { registeredTemplateNames } from "@/llm/validation/safety";
 import { generateWorld } from "@/world/generation/generator";
+import { IndexedDbBackend, WorldStore } from "@/storage/worldStore";
+import { SnapshotQueue } from "@/simulation/snapshots/queue";
+import { buildBranchState, compareSnapshots, type LLMPolicy } from "@/simulation/core/branch";
 import type {
   CityDetail,
   Season,
@@ -47,6 +50,11 @@ const ctx = self as unknown as WorkerScope;
 
 let engine: SimulationEngine | null = null;
 let batcher = new TickBatcher(100);
+/** 저장 큐(§28.4) — IndexedDbBackend(실패 시 메모리 폴백) */
+let store: WorldStore = new WorldStore(new IndexedDbBackend());
+let snapshotQueue: SnapshotQueue | null = null;
+let storageReady = false;
+let worldKey = ""; // `${worldId}` — 스냅숏 키 기준
 let timer: ReturnType<typeof setTimeout> | null = null;
 let speed: SimSpeed = 1;
 let paused = true;
@@ -161,11 +169,39 @@ function reportIsolations(): void {
   }
 }
 
+function scheduleSnapshot(label: "auto" | "user"): void {
+  if (!engine || !snapshotQueue) return;
+  snapshotQueue.enqueue({
+    worldId: worldKey,
+    tick: engine.state.clock.currentTick,
+    branchId: engine.state.branchId,
+    label,
+    state: engine.state,
+  });
+  void snapshotQueue.flushAll().then(() => {
+    if (engine && storageReady) {
+      void store.putWorld({
+        id: worldKey,
+        seed: engine.state.seed,
+        name: engine.state.name,
+        createdAt: Date.now(),
+        lastTick: engine.state.clock.currentTick,
+        simulationVersion: engine.state.simulationVersion,
+        generatorVersion: engine.state.generatorVersion,
+      });
+    }
+  });
+}
+
 function runTicks(count: number): void {
   if (!engine) return;
   const now = performance.now();
   for (let i = 0; i < count; i++) {
     engine.tick();
+    // §28.2 — 1년마다 자동 스냅샷 (큐가 틱 사이에 비동기 flush)
+    if (SnapshotQueue.isYearBoundary(engine.state.clock.currentTick)) {
+      scheduleSnapshot("auto");
+    }
     const stats = engine.state.globalStatistics;
     pendingStats.push({
       tick: engine.state.clock.currentTick,
@@ -216,9 +252,29 @@ function schedule(): void {
   }
 }
 
+async function openStorage(): Promise<void> {
+  if (storageReady) return;
+  try {
+    const backend = new IndexedDbBackend();
+    await backend.open();
+    store = new WorldStore(backend);
+  } catch {
+    store = new WorldStore(new (await import("@/storage/worldStore")).MemoryBackend()); // 폴백
+  }
+  storageReady = true;
+}
+
 function handleInit(request: Extract<SimRequest, { type: "init" }>): void {
   const gen = generateWorld(request.config, { seaLevel: request.seaLevel });
   engine = new SimulationEngine(initializeWorldState(gen));
+  worldKey = engine.state.id;
+  void openStorage().then(() => {
+    snapshotQueue = new SnapshotQueue(store);
+    snapshotQueue.onError = (message) =>
+      post({ type: "systemStatus", level: "error", code: "snapshot_save_failed", message });
+    // §28.4 — 시드는 생성 즉시 저장소에 보관된다
+    scheduleSnapshot("auto");
+  });
   batcher = new TickBatcher(100);
   speed = 1;
   paused = true;
@@ -358,6 +414,103 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
       break;
     case "setMajorThreshold":
       majorThreshold = Math.max(0, Math.min(100, request.threshold));
+      break;
+    case "snapshot":
+      if (!engine) break;
+      scheduleSnapshot(request.label === "user" ? "user" : "auto");
+      // 실제 저장 완료 후 통지 — 목록 조회 경쟁 방지
+      void snapshotQueue?.flushAll().then(() => {
+        post({
+          type: "snapshotSaved",
+          snapshotId: `snap:${worldKey}:${engine!.state.branchId}:${engine!.state.clock.currentTick}`,
+          tick: engine!.state.clock.currentTick,
+          branchId: engine!.state.branchId,
+        });
+      });
+      break;
+    case "listSnapshots":
+      void (async () => {
+        await openStorage();
+        const snapshots = await store.listSnapshots(worldKey);
+        post({
+          type: "snapshotList",
+          snapshots: snapshots.map((s) => ({ id: s.id, tick: s.tick, branchId: s.branchId, label: s.label })),
+        });
+      })();
+      break;
+    case "listBranches":
+      void (async () => {
+        await openStorage();
+        const branches = await store.listBranches(worldKey);
+        post({
+          type: "branchList",
+          branches: branches.map((b) => ({
+            id: b.id,
+            name: b.name,
+            parentBranchId: b.parentBranchId,
+            createdAtTick: b.createdAtTick,
+          })),
+        });
+      })();
+      break;
+    case "restoreSnapshot":
+      void (async () => {
+        await openStorage();
+        if (!engine) return;
+        const record = await store.getSnapshot(request.snapshotId);
+        if (!record) {
+          post({ type: "systemStatus", level: "warning", code: "snapshot_missing", message: "스냅숏을 찾을 수 없습니다" });
+          return;
+        }
+        try {
+          let branchId = record.branchId;
+          if (request.asBranch) {
+            const existing = await store.listBranches(worldKey);
+            branchId = `branch:${record.tick}:${existing.length + 1}`;
+            await store.putBranch({
+              id: branchId,
+              worldId: worldKey,
+              parentBranchId: record.branchId,
+              parentSnapshotId: record.id,
+              name: request.name ?? `분기 ${existing.length + 1}`,
+              createdAtTick: record.tick,
+            });
+          }
+          const restored = buildBranchState({
+            snapshot: record.data,
+            base: { config: engine.state.config, map: engine.state.map },
+            branchId,
+            llmPolicy: request.llmPolicy as LLMPolicy,
+          });
+          engine = new SimulationEngine(restored);
+          batcher = new TickBatcher(100);
+          pendingStats = [];
+          pendingNotices = [];
+          speed = 0;
+          paused = true;
+          emitTickBatch(engine.state.clock.currentTick, engine.state.clock.currentTick);
+          post({ type: "worldRestored", branchId, tick: engine.state.clock.currentTick });
+        } catch (error) {
+          post({
+            type: "systemStatus",
+            level: "error",
+            code: "snapshot_corrupt",
+            message: `복원 실패 — ${error instanceof Error ? error.message : "알 수 없음"} (§28.6)`,
+          });
+        }
+      })();
+      break;
+    case "compareSnapshots":
+      void (async () => {
+        await openStorage();
+        const a = await store.getSnapshot(request.snapshotAId);
+        const b = await store.getSnapshot(request.snapshotBId);
+        if (!a || !b) {
+          post({ type: "systemStatus", level: "warning", code: "compare_missing", message: "비교할 스냅숏이 없습니다" });
+          return;
+        }
+        post({ type: "branchComparison", comparison: compareSnapshots(a, b) });
+      })();
       break;
     case "requestLLM":
       if (!engine) break;

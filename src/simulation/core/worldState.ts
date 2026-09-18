@@ -68,6 +68,8 @@ export interface WorldState {
   seed: string;
   generatorVersion: string;
   simulationVersion: string;
+  /** 현재 분기 — 기본 "main", 분기 생성 시 교체 (§29) */
+  branchId: string;
   clock: SimulationClock;
   config: WorldConfig;
   map: WorldMap;
@@ -82,6 +84,8 @@ export interface WorldState {
   probabilityEvaluations: ProbabilityEvaluation[];
   /** 승인된 LLM 생성 기록(§23) — 재현성. BYOK 키는 절대 포함되지 않는다 */
   llmRecords: LLMGenerationRecord[];
+  /** 등록된 LLM 템플릿 — 스냅숏·복원 대상(재호출 없이 재사용 §23) */
+  llmTemplates: import("@/simulation/events/types").EventTemplate[];
   globalStatistics: GlobalStatistics;
   /** 인구 변화 원장(§8.3) — 스냅샷·상태 해시 포함 */
   changeLedger: ChangeLedger;
@@ -152,6 +156,7 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
     seed: config.seed,
     generatorVersion: gen.generatorVersion,
     simulationVersion: SIMULATION_VERSION,
+    branchId: "main",
     clock: { currentTick: 0, year: 0, month: 0, speed: 1, paused: true },
     config,
     map,
@@ -163,6 +168,7 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
     eventCooldowns: {},
     probabilityEvaluations: [],
     llmRecords: [],
+    llmTemplates: [],
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

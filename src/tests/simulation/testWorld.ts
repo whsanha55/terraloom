@@ -72,6 +72,7 @@ export function makeWorld(
     seed,
     generatorVersion: "test",
     simulationVersion: SIMULATION_VERSION,
+    branchId: "main",
     clock: { currentTick: 0, year: 0, month: 0, speed: 1, paused: true },
     config,
     map: createWorldMap(4, 4),
@@ -83,6 +84,7 @@ export function makeWorld(
     eventCooldowns: {},
     probabilityEvaluations: [],
     llmRecords: [],
+    llmTemplates: [],
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

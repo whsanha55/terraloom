@@ -16,6 +16,7 @@ import type { EventNotice } from "@/simulation/events/engine";
 import type { EventDetailData } from "@/simulation/events/detail";
 import type { LLMInput } from "@/llm/gateway/summary";
 import type { ChainContextInput, ChainScheduledSpec } from "@/llm/gateway/chain";
+import type { BranchComparison, LLMPolicy } from "@/simulation/core/branch";
 import type { EventTemplate } from "@/simulation/events/types";
 import type { WorldConfig } from "@/world/model/worldConfig";
 
@@ -48,6 +49,11 @@ export interface SimulationClientHandlers {
     chain?: { context: ChainContextInput; contextHash: string },
   ) => void;
   onLLMRegistered?: (result: { ok: boolean; templateId?: string; reason?: string }) => void;
+  onSnapshotSaved?: (result: { snapshotId: string; tick: number; branchId: string }) => void;
+  onSnapshotList?: (snapshots: Array<{ id: string; tick: number; branchId: string; label: string }>) => void;
+  onWorldRestored?: (result: { branchId: string; tick: number }) => void;
+  onBranchComparison?: (comparison: BranchComparison) => void;
+  onBranchList?: (branches: Array<{ id: string; name: string; parentBranchId: string; createdAtTick: number }>) => void;
 }
 
 export class SimulationClient {
@@ -93,6 +99,21 @@ export class SimulationClient {
           break;
         case "llmRegistered":
           handlers.onLLMRegistered?.({ ok: message.ok, templateId: message.templateId, reason: message.reason });
+          break;
+        case "snapshotSaved":
+          handlers.onSnapshotSaved?.({ snapshotId: message.snapshotId, tick: message.tick, branchId: message.branchId });
+          break;
+        case "snapshotList":
+          handlers.onSnapshotList?.(message.snapshots);
+          break;
+        case "worldRestored":
+          handlers.onWorldRestored?.({ branchId: message.branchId, tick: message.tick });
+          break;
+        case "branchComparison":
+          handlers.onBranchComparison?.(message.comparison);
+          break;
+        case "branchList":
+          handlers.onBranchList?.(message.branches);
           break;
         default:
           break;
@@ -152,6 +173,26 @@ export class SimulationClient {
 
   registerLLMTemplate(payload: LLMRegisterPayload): void {
     this.send({ type: "registerLLMTemplate", ...payload });
+  }
+
+  saveSnapshot(): void {
+    this.send({ type: "snapshot", label: "user" });
+  }
+
+  listSnapshots(): void {
+    this.send({ type: "listSnapshots" });
+  }
+
+  restoreSnapshot(snapshotId: string, options: { llmPolicy: LLMPolicy; asBranch: boolean; name?: string }): void {
+    this.send({ type: "restoreSnapshot", snapshotId, ...options });
+  }
+
+  compareSnapshots(snapshotAId: string, snapshotBId: string): void {
+    this.send({ type: "compareSnapshots", snapshotAId, snapshotBId });
+  }
+
+  listBranches(): void {
+    this.send({ type: "listBranches" });
   }
 
   dispose(): void {
