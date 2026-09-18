@@ -1,4 +1,5 @@
 import type { SettlementState, WorldState } from "@/simulation/core/worldState";
+import type { ActiveWorldEvent, HistoricalEvent, ScheduledWorldEvent } from "@/simulation/events/types";
 import { ChangeLedger } from "@/simulation/systems/ledger";
 import { Biome } from "@/world/generation/biome";
 import { createDefaultWorldConfig } from "@/world/model/worldConfig";
@@ -76,9 +77,11 @@ export function makeWorld(
     map: createWorldMap(4, 4),
     settlements: settlementRecord,
     routes,
-    activeEvents: [],
-    scheduledEvents: [],
-    eventHistory: [],
+    activeEvents: [] as ActiveWorldEvent[],
+    scheduledEvents: [] as ScheduledWorldEvent[],
+    eventHistory: [] as HistoricalEvent[],
+    eventCooldowns: {},
+    probabilityEvaluations: [],
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

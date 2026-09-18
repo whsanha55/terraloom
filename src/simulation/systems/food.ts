@@ -54,16 +54,22 @@ export function biomeFactor(biomeCounts: number[]): number {
 export interface FoodSystemOptions {
   /** 외부 주입 생산 배율 (가뭄 등 — worked example·시나리오 테스트용) */
   productionMultiplier?: (settlementId: string) => number;
+  /** 활성 이벤트의 생산 수정자 (§12.2.1 곱셈 스택) */
+  eventMultiplier?: (settlementId: string) => number;
+  /** 루트별 용량 수정자 — 교역로 단절 등 (§4.1 용량 가중치) */
+  routeCapacityMultiplier?: (routeId: string) => number;
 }
 
 export function runFoodSettlement(state: WorldState, options: FoodSystemOptions = {}): void {
   const month = state.clock.month;
   const active = Object.values(state.settlements).filter((s) => s.status === "active");
 
-  // 1. 생산
+  // 1. 생산 — 기준값 × Π(이벤트 수정자) (§12.2.1)
   const production = new Map<string, number>();
   for (const settlement of active) {
-    const multiplier = options.productionMultiplier?.(settlement.id) ?? 1;
+    const multiplier =
+      (options.productionMultiplier?.(settlement.id) ?? 1) *
+      (options.eventMultiplier?.(settlement.id) ?? 1);
     const value =
       settlement.carryingCapacity *
       seasonalFactor(month) *
@@ -100,10 +106,11 @@ export function runFoodSettlement(state: WorldState, options: FoodSystemOptions 
       receiverId = aId;
     }
     if (donorId === null || receiverId === null) continue;
+    const capacity = ROUTE_CAPACITY * (options.routeCapacityMultiplier?.(routeId) ?? 1);
     const amount = Math.min(
       (surplus.get(donorId) ?? 0) * TRADE_FRACTION,
       deficit.get(receiverId) ?? 0,
-      ROUTE_CAPACITY,
+      capacity,
     );
     if (amount <= 0) continue;
     surplus.set(donorId, (surplus.get(donorId) ?? 0) - amount);

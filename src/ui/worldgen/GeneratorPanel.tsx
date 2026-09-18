@@ -14,6 +14,7 @@ import type {
   StatsPoint,
   WorldSummary,
 } from "@/workers/protocol";
+import type { EventNotice } from "@/simulation/events/engine";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
 import { StatsChart } from "./StatsChart";
@@ -67,6 +68,8 @@ export function GeneratorPanel() {
   const [stats, setStats] = useState<StatsPoint[]>([]);
   const [liveSettlements, setLiveSettlements] = useState<Record<string, SettlementSnapshot>>({});
   const [migrations, setMigrations] = useState<MigrationFlow[]>([]);
+  const [eventLog, setEventLog] = useState<EventNotice[]>([]);
+  const [majorEvent, setMajorEvent] = useState<EventNotice | null>(null);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
 
@@ -82,8 +85,12 @@ export function GeneratorPanel() {
           }
           return next;
         });
+        if (notification.events.length > 0) {
+          setEventLog((prev) => [...notification.events, ...prev].slice(0, 30));
+        }
       },
       onStatsUpdate: (series) => setStats((prev) => [...prev, ...series]),
+      onMajorEvent: (notice) => setMajorEvent(notice),
     });
     clientRef.current = client;
     return () => {
@@ -114,6 +121,8 @@ export function GeneratorPanel() {
       setStats([]);
       setLiveSettlements({});
       setMigrations([]);
+      setEventLog([]);
+      setMajorEvent(null);
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -205,6 +214,39 @@ export function GeneratorPanel() {
       {world ? (
         <>
           <TimeControls summary={summary} onSetSpeed={handleSetSpeed} onStep={handleStep} />
+
+          {majorEvent && (
+            <p
+              data-testid="major-event-banner"
+              className="mt-sm rounded-md bg-[#FFF7ED] px-md py-sm text-sm font-medium text-warning"
+            >
+              사건 정지: {majorEvent.name} — {majorEvent.targetName} (중요도{" "}
+              <span className="font-numeric tnum">{majorEvent.importance}</span>) · 재생으로 계속
+            </p>
+          )}
+
+          {eventLog.length > 0 && (
+            <section className="mt-md" aria-label="최근 사건 로그">
+              <h2 className="text-sm font-semibold text-text">최근 사건 (디버그)</h2>
+              <ul data-testid="event-log" className="mt-xs max-h-40 overflow-y-auto rounded-md border border-border">
+                {eventLog.map((event) => (
+                  <li
+                    key={event.id}
+                    className="flex items-baseline gap-md border-b border-border px-md py-xs last:border-b-0 text-sm"
+                  >
+                    <span className="font-numeric tnum text-text-muted">
+                      {Math.floor(event.startedTick / 12) + 1}년 {(event.startedTick % 12) + 1}월
+                    </span>
+                    <span className="text-text">{event.name}</span>
+                    <span className="text-text-muted">{event.targetName}</span>
+                    <span className="font-numeric tnum ml-auto text-text-muted">
+                      중요도 {event.importance}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <div className="mt-md flex flex-wrap items-center gap-md">
             <p className="flex flex-wrap items-center gap-x-md gap-y-xs text-text-muted">

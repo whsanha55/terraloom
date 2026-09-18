@@ -6,6 +6,7 @@
  * 지도 등 대용량 TypedArray는 transfer list로 제로카피 전달한다(T16).
  */
 import type { RouteGen, SettlementGen } from "@/world/generation/settlements";
+import type { EventNotice } from "@/simulation/events/engine";
 import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 
@@ -95,8 +96,10 @@ export type SimNotification =
       changes: StateChange[];
       settlements: SettlementSnapshot[];
       migrations: MigrationFlow[];
+      /** 이 배치 구간에 발생·기록된 사건 (Step 8) */
+      events: EventNotice[];
     }
-  | { type: "majorEvent"; eventId: string; paused: boolean } // Step 8+
+  | { type: "majorEvent"; notice: EventNotice; paused: boolean } // Step 8 — 중요 사건 자동 정지
   | { type: "statsUpdate"; series: StatsPoint[] } // 마지막 통지 이후 증분
   | {
       type: "systemStatus";

@@ -11,16 +11,19 @@ import type {
   StatsPoint,
   WorldReadyPayload,
 } from "@/workers/protocol";
+import type { EventNotice } from "@/simulation/events/engine";
 import type { WorldConfig } from "@/world/model/worldConfig";
 
 export type TickBatchNotification = Extract<SimNotification, { type: "tickBatch" }>;
 export type SystemStatusNotification = Extract<SimNotification, { type: "systemStatus" }>;
+export type MajorEventNotification = Extract<SimNotification, { type: "majorEvent" }>;
 
 export interface SimulationClientHandlers {
   onWorldReady?: (world: WorldReadyPayload) => void;
   onTickBatch?: (notification: TickBatchNotification) => void;
   onStatsUpdate?: (series: StatsPoint[]) => void;
   onSystemStatus?: (notification: SystemStatusNotification) => void;
+  onMajorEvent?: (notice: EventNotice, paused: boolean) => void;
 }
 
 export class SimulationClient {
@@ -45,6 +48,9 @@ export class SimulationClient {
           break;
         case "systemStatus":
           handlers.onSystemStatus?.(message);
+          break;
+        case "majorEvent":
+          handlers.onMajorEvent?.(message.notice, message.paused);
           break;
         default:
           break;

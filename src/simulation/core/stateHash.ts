@@ -59,8 +59,23 @@ export function computeStateHash(state: WorldState): string {
     parts.push(state.routes[id].settlementIds.join("->"));
   }
 
+  // 이벤트 상태 — 활성 사건·쿨다운·이력·평가 수 (§12, §13.1)
+  for (const event of [...state.activeEvents].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    parts.push(
+      `a:${event.id}:${event.templateVersion}:${event.startedTick}:${event.endsAtTick}:${event.chainDepth}:${event.causedByEventId ?? ""}`,
+    );
+  }
+  for (const scheduled of [...state.scheduledEvents].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    parts.push(`s:${scheduled.id}:${scheduled.activateAtTick}:${scheduled.expiresAtTick}`);
+  }
+  const cooldownKeys = Object.keys(state.eventCooldowns).sort();
+  for (const key of cooldownKeys) {
+    parts.push(`c:${key}:${stableNumber(state.eventCooldowns[key] ?? 0)}`);
+  }
+  const lastHistory = state.eventHistory[state.eventHistory.length - 1];
   parts.push(
-    `events:${state.activeEvents.length}/${state.scheduledEvents.length}/${state.eventHistory.length}`,
+    `h:${state.eventHistory.length}:${lastHistory ? `${lastHistory.id}:${lastHistory.endedTick}` : ""}`,
+    `e:${state.probabilityEvaluations.length}`,
     statsDigest(state),
     ledgerDigest(state),
   );

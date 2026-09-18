@@ -13,6 +13,7 @@
 import { SimulationEngine } from "@/simulation/core/engine";
 import { TickBatcher } from "@/simulation/core/scheduler";
 import { initializeWorldState } from "@/simulation/core/worldState";
+import { MAJOR_EVENT_IMPORTANCE, type EventNotice } from "@/simulation/events/engine";
 import { generateWorld } from "@/world/generation/generator";
 import type {
   Season,
@@ -49,6 +50,10 @@ function lastFlowsTotal(): number {
 
 /** 마지막 statsUpdate 이후 쌓인 증분 통계 지점 */
 let pendingStats: StatsPoint[] = [];
+/** 마지막 tickBatch 이후 쌓인 사건 통지 */
+let pendingNotices: EventNotice[] = [];
+/** 이미 통지한 격리 템플릿 (systemStatus 중복 방지, §22.1) */
+const reportedIsolations = new Set<string>();
 
 function post(message: SimNotification, transfer?: Transferable[]): void {
   if (transfer && transfer.length > 0) {
@@ -111,10 +116,27 @@ function emitTickBatch(fromTick: number, toTick: number): void {
     changes: [],
     settlements: settlementSnapshots(),
     migrations: engine ? engine.lastMigrationFlows : [],
+    events: pendingNotices,
   });
+  pendingNotices = [];
   if (pendingStats.length > 0) {
     post({ type: "statsUpdate", series: pendingStats });
     pendingStats = [];
+  }
+}
+
+/** 격리된 템플릿을 사용자에게 노출한다 (§22.1 — swallow and continue 금지) */
+function reportIsolations(): void {
+  if (!engine) return;
+  for (const [templateId, reason] of engine.eventEngine.isolatedTemplates) {
+    if (reportedIsolations.has(templateId)) continue;
+    reportedIsolations.add(templateId);
+    post({
+      type: "systemStatus",
+      level: "warning",
+      code: "event_template_isolated",
+      message: `사건 템플릿 ${templateId} 비활성화됨 — ${reason}`,
+    });
   }
 }
 
@@ -129,11 +151,29 @@ function runTicks(count: number): void {
       totalPopulation: stats.totalPopulation[stats.totalPopulation.length - 1] ?? 0,
       totalFoodStock: stats.totalFoodStock[stats.totalFoodStock.length - 1] ?? 0,
     });
+    pendingNotices.push(...engine.lastTickNotices);
+
+    // §9.5 — 중요 사건 즉시 통지 + 자체 정지. UI 응답 전 추가 틱 없음
+    const major = engine.lastTickNotices.find((n) => n.importance >= MAJOR_EVENT_IMPORTANCE);
+    if (major) {
+      paused = true;
+      engine.state.clock.paused = true;
+      engine.state.clock.speed = 0;
+      speed = 0;
+      const batch = batcher.flush(performance.now());
+      if (batch) emitTickBatch(batch.fromTick, batch.toTick);
+      else emitTickBatch(engine.state.clock.currentTick, engine.state.clock.currentTick);
+      post({ type: "majorEvent", notice: major, paused: true });
+      reportIsolations();
+      return;
+    }
+
     const batch = batcher.onTick(engine.state.clock.currentTick, now);
     if (batch) {
       emitTickBatch(batch.fromTick, batch.toTick);
     }
   }
+  reportIsolations();
 }
 
 function schedule(): void {
@@ -162,6 +202,8 @@ function handleInit(request: Extract<SimRequest, { type: "init" }>): void {
   speed = 1;
   paused = true;
   pendingStats = [];
+  pendingNotices = [];
+  reportedIsolations.clear();
   schedule(); // 일시 정지 상태로 시작 — 타이머 없음
 
   const { map } = gen;

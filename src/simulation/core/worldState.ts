@@ -12,6 +12,12 @@ import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 import { computeSettlementArea } from "@/world/model/territory";
 import { ChangeLedger } from "@/simulation/systems/ledger";
+import type {
+  ActiveWorldEvent,
+  HistoricalEvent,
+  ProbabilityEvaluation,
+  ScheduledWorldEvent,
+} from "@/simulation/events/types";
 import type { SimSpeed } from "@/workers/protocol";
 
 export interface SimulationClock {
@@ -66,9 +72,13 @@ export interface WorldState {
   map: WorldMap;
   settlements: Record<string, SettlementState>;
   routes: Record<string, RouteGen>;
-  activeEvents: [];
-  scheduledEvents: [];
-  eventHistory: [];
+  activeEvents: ActiveWorldEvent[];
+  scheduledEvents: ScheduledWorldEvent[];
+  eventHistory: HistoricalEvent[];
+  /** `${templateId}:${targetId}` → 쿨다운 해제 틱 */
+  eventCooldowns: Record<string, number>;
+  /** 발생한 사건의 확률 평가 기록(§13.1) — 근거 보존 */
+  probabilityEvaluations: ProbabilityEvaluation[];
   globalStatistics: GlobalStatistics;
   /** 인구 변화 원장(§8.3) — 스냅샷·상태 해시 포함 */
   changeLedger: ChangeLedger;
@@ -147,6 +157,8 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
     activeEvents: [],
     scheduledEvents: [],
     eventHistory: [],
+    eventCooldowns: {},
+    probabilityEvaluations: [],
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

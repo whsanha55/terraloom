@@ -11,6 +11,8 @@ export const BIRTH_RATE = 0.002; // 월 출생률
 export const NATURAL_DEATH_RATE = 0.001; // 월 자연 사망률
 export const OVERCROWDING_RATE = 0.02; // 수용력 초과분당 추가 사망률
 export const STARVATION_RATE = 0.3; // 미충족 인구의 월 사망 비율
+/** 질병 수준당 월 사망 비율 (§9.3.8 — 전염병 이벤트와 연결) */
+export const DISEASE_DEATH_RATE = 0.03;
 /** 거의 완전한 기근에서는 최소 이만큼 사망 — 마을이 0으로 소멸할 수 있다 */
 const FAMINE_MIN_DEATHS = 1;
 const FAMINE_THRESHOLD = 0.9;
@@ -29,12 +31,13 @@ export function runPopulationChange(state: WorldState): void {
 
     const births = Math.round(population * BIRTH_RATE);
     const natural = Math.round(population * (NATURAL_DEATH_RATE + OVERCROWDING_RATE * overRatio));
+    const disease = Math.round(population * settlement.diseaseLevel * DISEASE_DEATH_RATE);
     let starvation = Math.round(population * settlement.unmetRatio * STARVATION_RATE);
     if (settlement.unmetRatio > FAMINE_THRESHOLD) {
       starvation = Math.max(starvation, FAMINE_MIN_DEATHS);
     }
 
-    let next = population + births - natural - starvation;
+    let next = population + births - natural - disease - starvation;
     if (!Number.isFinite(next) || next < 0) {
       next = 0; // §33 불변식: 인구는 음수가 되지 않는다
     }
@@ -42,6 +45,7 @@ export function runPopulationChange(state: WorldState): void {
 
     ledger.record({ tick, settlementId: settlement.id, cause: "birth", amount: births });
     ledger.record({ tick, settlementId: settlement.id, cause: "natural", amount: -natural });
+    ledger.record({ tick, settlementId: settlement.id, cause: "disease", amount: -disease });
     ledger.record({
       tick,
       settlementId: settlement.id,
