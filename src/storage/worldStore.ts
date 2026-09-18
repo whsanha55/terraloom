@@ -173,7 +173,11 @@ export class WorldStore {
   }
 
   async putSnapshot(record: SnapshotLike): Promise<void> {
-    await this.backend.put("snapshots", record);
+    try {
+      await this.backend.put("snapshots", record);
+    } catch (error) {
+      throw toQuotaError(error); // 백엔드 공통 — §28.5 정리→재시도 판정용
+    }
   }
 
   async getSnapshot(id: string): Promise<SnapshotLike | undefined> {
