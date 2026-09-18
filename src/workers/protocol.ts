@@ -38,6 +38,8 @@ export interface WorldSummary {
   season: Season;
   totalPopulation: number;
   totalFoodStock: number;
+  /** 직전 틱 이주 총인원 */
+  migrationTotal: number;
   paused: boolean;
   speed: SimSpeed;
 }
@@ -55,6 +57,14 @@ export interface SettlementSnapshot {
   foodStock: number;
   foodMonthsRemaining: number;
   stability: number;
+  migrationPressure: number;
+}
+
+/** 직전 틱의 이주 흐름 — 지도 화살표 시각화(§25) */
+export interface MigrationFlow {
+  fromId: string;
+  toId: string;
+  amount: number;
 }
 
 export interface StatsPoint {
@@ -84,6 +94,7 @@ export type SimNotification =
       summary: WorldSummary;
       changes: StateChange[];
       settlements: SettlementSnapshot[];
+      migrations: MigrationFlow[];
     }
   | { type: "majorEvent"; eventId: string; paused: boolean } // Step 8+
   | { type: "statsUpdate"; series: StatsPoint[] } // 마지막 통지 이후 증분

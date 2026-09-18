@@ -39,6 +39,14 @@ let batcher = new TickBatcher(100);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let speed: SimSpeed = 1;
 let paused = true;
+/** 직전 틱 이주 총인원 */
+function lastFlowsTotal(): number {
+  if (!engine) return 0;
+  let total = 0;
+  for (const flow of engine.lastMigrationFlows) total += flow.amount;
+  return total;
+}
+
 /** 마지막 statsUpdate 이후 쌓인 증분 통계 지점 */
 let pendingStats: StatsPoint[] = [];
 
@@ -75,6 +83,7 @@ function buildSummary(): WorldSummary {
     season: seasonOf(clock.month),
     totalPopulation,
     totalFoodStock,
+    migrationTotal: lastFlowsTotal(),
     paused,
     speed,
   };
@@ -89,6 +98,7 @@ function settlementSnapshots(): SettlementSnapshot[] {
     foodStock: settlement.foodStock,
     foodMonthsRemaining: settlement.foodMonthsRemaining,
     stability: settlement.stability,
+    migrationPressure: settlement.migrationPressure,
   }));
 }
 
@@ -100,6 +110,7 @@ function emitTickBatch(fromTick: number, toTick: number): void {
     summary: buildSummary(),
     changes: [],
     settlements: settlementSnapshots(),
+    migrations: engine ? engine.lastMigrationFlows : [],
   });
   if (pendingStats.length > 0) {
     post({ type: "statsUpdate", series: pendingStats });

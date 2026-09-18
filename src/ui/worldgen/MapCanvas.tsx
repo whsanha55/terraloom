@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { RouteGen, SettlementGen } from "@/world/generation/settlements";
 import type { WorldMap } from "@/world/model/worldMap";
-import type { SettlementSnapshot } from "@/workers/protocol";
+import type { MigrationFlow, SettlementSnapshot } from "@/workers/protocol";
 import { renderElevationRGBA } from "@/world/rendering/elevationRender";
 import { renderBiomeRGBA, renderScalarRGBA } from "@/world/rendering/layerRender";
 
@@ -29,6 +29,8 @@ interface MapCanvasProps {
   routes: RouteGen[];
   /** 라이브 도시 상태 (인구·폐허 여부) — 도착 전까지 정적 표시 */
   live?: Record<string, SettlementSnapshot>;
+  /** 직전 틱 이주 흐름 — 파란 화살표 (DESIGN.md map-path-migration) */
+  migrations?: MigrationFlow[];
   onSelectCell?: (cell: { x: number; y: number }) => void;
 }
 
@@ -39,6 +41,7 @@ export function MapCanvas({
   settlements,
   routes,
   live,
+  migrations,
   onSelectCell,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -94,6 +97,39 @@ export function MapCanvas({
       }
       ctx.stroke();
 
+      // 이주 경로 — 항상 파란 화살표 (DESIGN.md). 각도 계산은 렌더링 전용
+      // (시뮬레이션·월드젠의 허용 연산 제한 §7.1 대상 아님)
+      for (const flow of migrations ?? []) {
+        const from = byId.get(flow.fromId);
+        const to = byId.get(flow.toId);
+        if (!from || !to || flow.amount <= 0) continue;
+        const x1 = from.x + 0.5;
+        const y1 = from.y + 0.5;
+        const x2 = to.x + 0.5;
+        const y2 = to.y + 0.5;
+        const headX = x1 + (x2 - x1) * 0.75;
+        const headY = y1 + (y2 - y1) * 0.75;
+        ctx.strokeStyle = "#0EA5E9";
+        ctx.lineWidth = Math.max(1, scale * Math.min(3, 0.8 + flow.amount / 300));
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(headX, headY);
+        ctx.stroke();
+        const headSize = 2 + 3 * scale;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.save();
+        ctx.translate(headX, headY);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-headSize, headSize * 0.5);
+        ctx.lineTo(-headSize, -headSize * 0.5);
+        ctx.closePath();
+        ctx.fillStyle = "#0EA5E9";
+        ctx.fill();
+        ctx.restore();
+      }
+
       // 도시 = 파란 원, 면적 ∝ 인구 (DESIGN.md). 폐허는 중립 흔적(§8.2)
       ctx.lineWidth = Math.max(1, scale);
       for (const settlement of settlements) {
@@ -120,7 +156,7 @@ export function MapCanvas({
         ctx.stroke();
       }
     }
-  }, [map, seaLevel, layer, settlements, routes, live]);
+  }, [map, seaLevel, layer, settlements, routes, live, migrations]);
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onSelectCell) return;

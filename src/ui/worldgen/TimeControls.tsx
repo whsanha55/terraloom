@@ -38,6 +38,9 @@ export function TimeControls({ summary, onSetSpeed, onStep }: TimeControlsProps)
           {summary.totalPopulation.toLocaleString("ko-KR")}
         </span>
       </p>
+      <p className="font-numeric tnum text-text-muted">
+        이주 <span data-testid="migration-total">{summary.migrationTotal}</span>명
+      </p>
 
       <div className="ml-auto flex items-center gap-sm">
         <button

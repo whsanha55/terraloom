@@ -7,7 +7,13 @@ import { computeLandRatio } from "@/world/generation/elevation";
 import type { SettlementGen, RouteGen } from "@/world/generation/settlements";
 import { createDefaultWorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
-import type { SettlementSnapshot, SimSpeed, StatsPoint, WorldSummary } from "@/workers/protocol";
+import type {
+  MigrationFlow,
+  SettlementSnapshot,
+  SimSpeed,
+  StatsPoint,
+  WorldSummary,
+} from "@/workers/protocol";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
 import { StatsChart } from "./StatsChart";
@@ -45,6 +51,7 @@ const INITIAL_SUMMARY: WorldSummary = {
   season: "winter",
   totalPopulation: 0,
   totalFoodStock: 0,
+  migrationTotal: 0,
   paused: true,
   speed: 1,
 };
@@ -59,6 +66,7 @@ export function GeneratorPanel() {
   const [summary, setSummary] = useState<WorldSummary>(INITIAL_SUMMARY);
   const [stats, setStats] = useState<StatsPoint[]>([]);
   const [liveSettlements, setLiveSettlements] = useState<Record<string, SettlementSnapshot>>({});
+  const [migrations, setMigrations] = useState<MigrationFlow[]>([]);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
 
@@ -66,6 +74,7 @@ export function GeneratorPanel() {
     const client = new SimulationClient({
       onTickBatch: (notification) => {
         setSummary(notification.summary);
+        setMigrations(notification.migrations);
         setLiveSettlements((prev) => {
           const next = { ...prev };
           for (const snapshot of notification.settlements) {
@@ -104,6 +113,7 @@ export function GeneratorPanel() {
       setSelectedCell(null);
       setStats([]);
       setLiveSettlements({});
+      setMigrations([]);
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -247,6 +257,7 @@ export function GeneratorPanel() {
             settlements={world.settlements}
             routes={world.routes}
             live={liveSettlements}
+            migrations={migrations}
             onSelectCell={setSelectedCell}
           />
 

@@ -6,13 +6,18 @@
  * 현재는 시계 전이만 존재 — 도시 시스템은 Step 6~7, 사건은 Step 8~9가 추가한다.
  */
 import { runFoodSettlement } from "../systems/food";
+import { runMigration, type MigrationFlow } from "../systems/migration";
 import { runPopulationChange } from "../systems/population";
+import { runStability } from "../systems/stability";
 import { computeStateHash } from "./stateHash";
 import type { WorldState } from "./worldState";
 
 export const TICKS_PER_YEAR = 12;
 
 export class SimulationEngine {
+  /** 직전 틱의 이주 흐름 — UI 시각화(이주 경로 화살표)용 */
+  public lastMigrationFlows: MigrationFlow[] = [];
+
   constructor(public readonly state: WorldState) {}
 
   tick(): void {
@@ -22,8 +27,11 @@ export class SimulationEngine {
     clock.month = clock.currentTick % TICKS_PER_YEAR;
 
     // §9.3 — 6. 식량 정산(§9.4, 교역 포함) → 8. 인구 변화(원장 기록)
+    //        → 9. 이주 공동 정산(§9.6) → 10. 안정도
     runFoodSettlement(this.state);
     runPopulationChange(this.state);
+    this.lastMigrationFlows = runMigration(this.state);
+    runStability(this.state);
 
     // 15. 통계 집계
     let totalPopulation = 0;
