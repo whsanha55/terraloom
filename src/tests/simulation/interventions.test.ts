@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyIntervention, INTERVENTION_TYPES } from "@/simulation/systems/interventions";
+import {
+  applyIntervention,
+  estimateInterventionCost,
+  INTERVENTION_TYPES,
+} from "@/simulation/systems/interventions";
 import { EventEngine } from "@/simulation/events/engine";
 import { BUILTIN_TEMPLATES } from "@/simulation/events/templates/builtin";
 import { runFoodSettlement } from "@/simulation/systems/food";
@@ -221,5 +225,30 @@ describe("개입 기록·재현 (Step 14 완료 조건)", () => {
       expect(definition!.label.length).toBeGreaterThan(0);
       expect(definition!.baseCost).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe("개입 비용 미리보기 — 엔진 비용 공식과 동일 (§24)", () => {
+  it("foodAid 비용은 개월 수(1~24 clamp) × 기본비용", () => {
+    expect(estimateInterventionCost("foodAid", { months: 3 })).toBe(100 * 3);
+    expect(estimateInterventionCost("foodAid", { months: 99 })).toBe(100 * 24); // 엔진 clamp와 동일
+    expect(estimateInterventionCost("foodAid", { months: 0 })).toBe(100 * 1);
+  });
+
+  it("disasterResponse 비용은 자연재해 건수 × 기본비용 — 0건이면 0", () => {
+    expect(estimateInterventionCost("disasterResponse", { naturalDisasterCount: 4 })).toBe(150 * 4);
+    expect(estimateInterventionCost("disasterResponse", { naturalDisasterCount: 0 })).toBe(0);
+  });
+
+  it("적용 비용은 미리보기와 일치한다", () => {
+    const { world, engine } = setup();
+    engine.forceStart(world, "drought", "aren", 5); // 자연재해 1건
+    const disaster = applyIntervention(world, intervention("disasterResponse", ["aren"]), engine);
+    expect(disaster.ok).toBe(true);
+    expect(disaster.cost).toBe(estimateInterventionCost("disasterResponse", { naturalDisasterCount: 1 }));
+
+    const aid = applyIntervention(world, intervention("foodAid", ["aren"], { months: 6 }), engine);
+    expect(aid.ok).toBe(true);
+    expect(aid.cost).toBe(estimateInterventionCost("foodAid", { months: 6 }));
   });
 });

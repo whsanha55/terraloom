@@ -41,6 +41,26 @@ function numberParam(intervention: UserIntervention, key: string, fallback: numb
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+/**
+ * 개입 비용 미리보기 (§24) — 엔진 비용 산정과 동일 공식.
+ * UI가 실행 전 표시·버튼 활성 판정에 쓴다 (엔진-UI 불일치 방지).
+ */
+export function estimateInterventionCost(
+  type: string,
+  options: { months?: number; naturalDisasterCount?: number } = {},
+): number {
+  const definition = INTERVENTION_TYPES[type];
+  if (!definition) return 0;
+  if (type === "foodAid") {
+    return definition.baseCost * clamp(Math.round(options.months ?? 1), 1, 24);
+  }
+  if (type === "disasterResponse") {
+    const count = Math.max(0, Math.trunc(options.naturalDisasterCount ?? 0));
+    return count === 0 ? 0 : definition.baseCost * count;
+  }
+  return definition.baseCost;
+}
+
 export function applyIntervention(
   state: WorldState,
   intervention: UserIntervention,
@@ -60,26 +80,28 @@ export function applyIntervention(
     return { ok: false, reason: "폐허 도시에는 개입할 수 없습니다 (§8.2)", description: "", cost: 0 };
   }
 
-  // 비용 산정 — 적용 전에 검사한다 (거부 시 상태 불변)
+  // 비용 산정 — 적용 전에 검사한다 (거부 시 상태 불변). 공식은 estimateInterventionCost와 동일
   const months = intervention.type === "foodAid"
     ? clamp(Math.round(numberParam(intervention, "months", 1)), 1, 24)
     : 0;
-  let cost = definition.baseCost * (intervention.type === "foodAid" ? months : 1);
+  let naturalDisasterCount = 0;
   if (intervention.type === "disasterResponse") {
     // 종료할 자연재해가 없으면 아예 실행하지 않는다 — 비용도 없다
-    let count = 0;
     for (const target of targets) {
       for (const eventId of target.activeEventIds) {
         const event = state.activeEvents.find((e) => e.id === eventId);
         const template = event ? eventEngine.registry.get(event.templateId) : undefined;
-        if (template?.category === "natural") count += 1;
+        if (template?.category === "natural") naturalDisasterCount += 1;
       }
     }
-    if (count === 0) {
+    if (naturalDisasterCount === 0) {
       return { ok: false, reason: "종료할 자연재해가 없습니다", description: "", cost: 0 };
     }
-    cost = definition.baseCost * count;
   }
+  const cost = estimateInterventionCost(intervention.type, {
+    months,
+    naturalDisasterCount,
+  });
   if (state.interventionPoints < cost) {
     return {
       ok: false,
