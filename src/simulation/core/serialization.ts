@@ -100,7 +100,7 @@ export function deserializeDynamicState(
     },
     config: base.config,
     map: base.map,
-    settlements: structuredClone(data.settlements),
+    settlements: normalizeSettlements(data.settlements),
     routes: structuredClone(data.routes),
     activeEvents: structuredClone(data.activeEvents),
     scheduledEvents: structuredClone(data.scheduledEvents),
@@ -111,7 +111,20 @@ export function deserializeDynamicState(
     interventions: structuredClone(data.interventions ?? []),
     interventionPoints: data.interventionPoints ?? 2000,
     globalStatistics: structuredClone(data.globalStatistics),
-    llmRecords: structuredClone(data.llmRecords),
+    llmRecords: structuredClone(data.llmRecords ?? []),
     changeLedger: ledger,
   };
+}
+
+/** 정착지별 신규 필드 기본값 채움 — 누락 시 첫 틱 TypeError로 worker가 죽는 것을 막는다 */
+function normalizeSettlements(
+  settlements: SerializedDynamicState["settlements"],
+): WorldState["settlements"] {
+  const clone = structuredClone(settlements);
+  for (const settlement of Object.values(clone)) {
+    if (!settlement.policies) {
+      settlement.policies = { migrationOpenness: 1, tradePriority: 1 };
+    }
+  }
+  return clone;
 }

@@ -60,4 +60,40 @@ describe("동적 상태 직렬화 — 저장 후 재실행 결과 동일 (Step 8
       deserializeDynamicState(data, { config: engine.state.config, map: engine.state.map }),
     ).toThrow(SnapshotCorruptError);
   });
+
+  it("이전 버전(0.1.0) 스냅샷은 버전 게이트에서 거부된다 (§28.6 — 정책 필드 추가 이전)", () => {
+    const engine = makeEngine("ser-old", 3);
+    const data = serializeDynamicState(engine.state);
+    data.simulationVersion = "0.1.0";
+    expect(() =>
+      deserializeDynamicState(data, { config: engine.state.config, map: engine.state.map }),
+    ).toThrow(SnapshotCorruptError);
+  });
+
+  it("정책(policies) 필드가 없는 정착지는 기본값으로 채워져 첫 틱에 크래시하지 않는다", () => {
+    const engine = makeEngine("ser-policies", 3);
+    const data = serializeDynamicState(engine.state);
+    for (const settlement of Object.values(data.settlements)) {
+      delete (settlement as { policies?: unknown }).policies;
+    }
+    const restored = deserializeDynamicState(data, {
+      config: engine.state.config,
+      map: engine.state.map,
+    });
+    for (const settlement of Object.values(restored.settlements)) {
+      expect(settlement.policies).toEqual({ migrationOpenness: 1, tradePriority: 1 });
+    }
+    expect(() => new SimulationEngine(restored).tick()).not.toThrow();
+  });
+
+  it("llmRecords가 없는 스냅샷은 빈 배열로 복원된다", () => {
+    const engine = makeEngine("ser-llmrecords", 3);
+    const data = serializeDynamicState(engine.state);
+    (data as { llmRecords?: unknown }).llmRecords = undefined;
+    const restored = deserializeDynamicState(data, {
+      config: engine.state.config,
+      map: engine.state.map,
+    });
+    expect(restored.llmRecords).toEqual([]);
+  });
 });

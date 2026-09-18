@@ -1,4 +1,27 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+function parseClockMonths(text: string): number {
+  const match = text.match(/세계력 (\d+)년 (\d+)월/);
+  if (!match) throw new Error(`세계력 파싱 실패: ${text}`);
+  return (Number(match[1]) - 1) * 12 + Number(match[2]); // 경과 개월 수
+}
+
+/** 년 단위 진행 — 중요 사건 자동 정지(§9.5)에 끊겨도 개월 스텝으로 목표까지 이어 간다 */
+async function advanceYears(page: Page, years: number): Promise<void> {
+  const clock = page.getByTestId("world-clock");
+  const target = parseClockMonths((await clock.textContent()) ?? "") + years * 12;
+  let guard = 0;
+  while (parseClockMonths((await clock.textContent()) ?? "") < target) {
+    if (++guard > years * 12 + 12) throw new Error("시간 진행 실패 — 자동 정지 반복");
+    const remaining = target - parseClockMonths((await clock.textContent()) ?? "");
+    if (remaining >= 12) {
+      await page.getByRole("button", { name: "1년", exact: true }).click();
+    } else {
+      await page.getByRole("button", { name: "1개월", exact: true }).click();
+    }
+    await page.waitForTimeout(150);
+  }
+}
 
 test("저장 → 분기 생성 → 두 역사 비교 (Step 13)", async ({ page }) => {
   await page.goto("/");
@@ -43,8 +66,7 @@ test("복원은 같은 상태로 되돌린다 — 원본 역사와 동일 진행
   await page.getByRole("button", { name: "세계 생성" }).click();
   await expect(page.getByTestId("settlement-count")).toBeVisible();
 
-  await page.getByRole("button", { name: "1년", exact: true }).click();
-  await page.getByRole("button", { name: "1년", exact: true }).click();
+  await advanceYears(page, 2);
   await expect(page.getByTestId("world-clock")).toContainText("세계력 3년 1월");
 
   // 1년 시점 스냅숏으로 복원 (분기 아님 — 같은 main)
@@ -55,7 +77,6 @@ test("복원은 같은 상태로 되돌린다 — 원본 역사와 동일 진행
   // 복원 직후 일시정지 — 1년 시점으로 되돌아갔다
   await expect(page.getByTestId("world-clock")).toContainText("세계력 1년", { timeout: 10_000 });
   // 다시 2년 진행하면 원본과 같은 시점 도달 (결정론)
-  await page.getByRole("button", { name: "1년", exact: true }).click();
-  await page.getByRole("button", { name: "1년", exact: true }).click();
+  await advanceYears(page, 2);
   await expect(page.getByTestId("world-clock")).toContainText("세계력 3년 1월");
 });

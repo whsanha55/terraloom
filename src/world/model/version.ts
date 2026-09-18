@@ -3,8 +3,8 @@
  * 이 값을 바꾸면 기존 시드의 월드젠·시뮬레이션 결과가 달라진다.
  */
 
-/** 시뮬레이션 규칙(정산·이벤트·확률)의 버전 */
-export const SIMULATION_VERSION = "0.1.0";
+/** 시뮬레이션 규칙(정산·이벤트·확률)의 버전 — 정책 필드 추가(§24.2)로 0.2.0 상향 (§28.6) */
+export const SIMULATION_VERSION = "0.2.0";
 
 /** 월드젠(고도·기후·바이옴·강·도시)의 버전 */
 export const GENERATOR_VERSION = "0.1.0";
