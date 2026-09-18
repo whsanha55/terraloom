@@ -17,7 +17,11 @@ import { MAJOR_EVENT_IMPORTANCE, type EventNotice } from "@/simulation/events/en
 import { describeEvent } from "@/simulation/events/detail";
 import { POPULATION_CHANGE_CAUSES } from "@/simulation/systems/ledger";
 import { summarizeForLLM, computeInputHash } from "@/llm/gateway/summary";
-import { registerLLMTemplate } from "@/llm/records";
+import {
+  summarizeChainContext,
+  computeChainContextHash,
+} from "@/llm/gateway/chain";
+import { registerLLMTemplate, registerChainTemplate } from "@/llm/records";
 import { registeredTemplateNames } from "@/llm/validation/safety";
 import { generateWorld } from "@/world/generation/generator";
 import type {
@@ -360,13 +364,57 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
       // §18 요약 + §23 입력 해시 + 중복 검사용 등록 이름 목록 (LLM은 UI 게이트웨이가 담당)
       {
         const input = summarizeForLLM(engine.state);
+        const chain =
+          request.mode === "chain" && request.eventId
+            ? (() => {
+                const context = summarizeChainContext(
+                  engine!.state,
+                  engine!.eventEngine.registry,
+                  request.eventId!,
+                );
+                return context
+                  ? { context, contextHash: computeChainContextHash(context) }
+                  : undefined;
+              })()
+            : undefined;
+        if (request.mode === "chain" && !chain) {
+          post({
+            type: "systemStatus",
+            level: "info",
+            code: "llm_chain_no_context",
+            message: "연쇄 문맥을 만들 수 없습니다 — 진행 중인 사건을 선택하세요",
+          });
+        }
         post({
           type: "llmRequest",
           input,
           inputHash: computeInputHash(input),
           registeredNames: [...registeredTemplateNames(engine.eventEngine.registry)],
           tick: engine.state.clock.currentTick,
+          chain,
         });
+      }
+      break;
+    case "registerChainTemplate":
+      if (!engine) break;
+      {
+        const result = registerChainTemplate(engine.state, engine.eventEngine, {
+          template: request.template,
+          scheduled: request.scheduled,
+          inputHash: request.inputHash,
+          rawOutput: request.rawOutput,
+          provider: request.provider,
+          model: request.model,
+          promptVersion: request.promptVersion,
+          approvedBy: request.approvedBy,
+          usage: request.usage,
+        });
+        if (result.ok) {
+          post({ type: "llmRegistered", ok: true, templateId: result.templateId });
+        } else {
+          post({ type: "systemStatus", level: "warning", code: "llm_register_rejected", message: result.reason ?? "등록 거부" });
+          post({ type: "llmRegistered", ok: false, reason: result.reason });
+        }
       }
       break;
     case "registerLLMTemplate":

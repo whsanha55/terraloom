@@ -7,6 +7,14 @@
 import { RecommendationResponseSchema, type LLMRecommendation } from "../schemas/recommendation";
 import { validateCandidate, type CandidateValidation } from "../validation/safety";
 import { buildEventRecommendationPrompt, PROMPT_VERSION } from "./prompt";
+import {
+  buildChainRecommendationPrompt,
+  ChainResponseSchema,
+  CHAIN_PROMPT_VERSION,
+  validateChainCandidate,
+  type ChainCandidateValidation,
+  type ChainContextInput,
+} from "./chain";
 import type { LLMProvider } from "./provider";
 import type { LLMInput } from "./summary";
 
@@ -15,9 +23,25 @@ export interface GatewayCandidate {
   validation: CandidateValidation;
 }
 
+export interface ChainGatewayCandidate {
+  recommendation: LLMRecommendation;
+  validation: ChainCandidateValidation;
+}
+
 export interface GatewayResult {
   status: "ok" | "fallback";
   candidates: GatewayCandidate[];
+  rejected: Array<{ recommendation: LLMRecommendation; reason: string }>;
+  provider: string;
+  model: string;
+  rawOutput: string;
+  promptVersion: string;
+  error?: string;
+}
+
+export interface ChainGatewayResult {
+  status: "ok" | "fallback";
+  candidates: ChainGatewayCandidate[];
   rejected: Array<{ recommendation: LLMRecommendation; reason: string }>;
   provider: string;
   model: string;
@@ -70,6 +94,55 @@ export async function requestRecommendations(
       rejected: [],
       rawOutput,
       error: `LLM 호출 실패(${error instanceof Error ? error.message : "알 수 없음"}) — 규칙 기반으로 계속합니다 (§22)`,
+    };
+  }
+}
+
+/** 연쇄 후보 게이트웨이 (Step 12) — 폴백 시 내장 연쇄 후보가 계속 동작한다(§22 기본 후보) */
+export async function requestChainRecommendations(
+  provider: LLMProvider,
+  ctx: ChainContextInput,
+  registeredNames: ReadonlySet<string>,
+): Promise<ChainGatewayResult> {
+  const base = {
+    provider: provider.name,
+    model: provider.model,
+    promptVersion: CHAIN_PROMPT_VERSION,
+  };
+  let rawOutput = "";
+  try {
+    const prompt = buildChainRecommendationPrompt(ctx);
+    rawOutput = await provider.generateRecommendations(prompt);
+    const parsed = ChainResponseSchema.safeParse(JSON.parse(rawOutput));
+    if (!parsed.success) {
+      return {
+        ...base,
+        status: "fallback",
+        candidates: [],
+        rejected: [],
+        rawOutput,
+        error: "스키마 검증 실패 — 내장 연쇄 후보로 계속합니다 (§22)",
+      };
+    }
+    const candidates: ChainGatewayCandidate[] = [];
+    const rejected: Array<{ recommendation: LLMRecommendation; reason: string }> = [];
+    for (const recommendation of parsed.data.recommendations) {
+      const validation = validateChainCandidate(recommendation, ctx, registeredNames);
+      if (validation.rejected || !validation.template || !validation.scheduled) {
+        rejected.push({ recommendation, reason: validation.rejected ?? "변환 실패" });
+      } else {
+        candidates.push({ recommendation, validation });
+      }
+    }
+    return { ...base, status: "ok", candidates, rejected, rawOutput };
+  } catch (error) {
+    return {
+      ...base,
+      status: "fallback",
+      candidates: [],
+      rejected: [],
+      rawOutput,
+      error: `LLM 호출 실패(${error instanceof Error ? error.message : "알 수 없음"}) — 내장 연쇄 후보로 계속합니다 (§22)`,
     };
   }
 }

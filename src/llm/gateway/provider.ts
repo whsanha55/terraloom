@@ -8,7 +8,7 @@
  */
 import { createRng } from "@/world/random/rng";
 import { fnv1a32 } from "@/world/random/seed";
-import type { LLMRecommendation, LLMRecommendationResponse } from "../schemas/recommendation";
+import type { LLMRecommendation } from "../schemas/recommendation";
 
 export interface LLMProvider {
   readonly name: string;
@@ -107,6 +107,7 @@ export class MockLLMProvider implements LLMProvider {
   async generateRecommendations(prompt: string): Promise<string> {
     const rng = createRng(fnv1a32(`${this.model}:${prompt}`));
     const cities = extractCityIds(prompt);
+    const isChainPrompt = prompt.includes("suggestedChainWeight"); // 연쇄 프롬프트 식별
     const count = rng.nextInt(3, 6); // 3~5개
     const pool = [...CATALOG.keys()];
     // 결정론적 셔플
@@ -114,12 +115,12 @@ export class MockLLMProvider implements LLMProvider {
       const j = rng.nextInt(0, i + 1);
       [pool[i], pool[j]] = [pool[j]!, pool[i]!];
     }
-    const recommendations: LLMRecommendation[] = [];
+    const recommendations: Array<Record<string, unknown>> = [];
     for (let index = 0; index < count; index++) {
       const blueprint = CATALOG[pool[index] % CATALOG.length];
       if (!blueprint) continue;
       const targetId = cities.length > 0 ? cities[index % Math.min(cities.length, 2)]! : "aren";
-      recommendations.push({
+      const recommendation: Record<string, unknown> & Partial<LLMRecommendation> = {
         temporaryId: `candidate_${index + 1}`,
         name: blueprint.name,
         category: blueprint.category,
@@ -136,10 +137,16 @@ export class MockLLMProvider implements LLMProvider {
         effects: blueprint.effects.map((effect) => ({ ...effect })),
         followUps: [],
         reasoningSummary: blueprint.reasoning,
-      });
+      };
+      if (isChainPrompt) {
+        recommendation.suggestedMinDelayTicks = rng.nextInt(1, 5);
+        recommendation.suggestedMaxDelayTicks = rng.nextInt(5, 13);
+        recommendation.suggestedChainWeight = Number((0.5 + rng.next() * 2).toFixed(2));
+      }
+      recommendations.push(recommendation);
     }
-    const response: LLMRecommendationResponse = { recommendations };
-    return JSON.stringify(response);
+    // 모의 출력은 원시 JSON 텍스트 — 실제 LLM과 동일하게 게이트웨이가 스키마 검증한다
+    return JSON.stringify({ recommendations });
   }
 }
 

@@ -144,3 +144,34 @@ export function validateCandidate(
 export function registeredTemplateNames(registry: ReadonlyMap<string, { name: string }>): Set<string> {
   return new Set([...registry.values()].map((template) => template.name));
 }
+
+/**
+ * 자동 승인 안전 등급 (§21.2) — 효과 크기를 범위 대비 비율로 정규화해 판정.
+ *   low    : 모든 효과가 허용 범위의 절반 이내 — 반자동 모드에서 자동 등록 가능
+ *   medium : 그 이상 — 설정에 따라
+ *   high   : 범위의 80% 이상 — 항상 수동 승인
+ */
+export function classifySafety(template: EventTemplate): "low" | "medium" | "high" {
+  let worst = 0;
+  for (const effect of [...template.immediateEffects, ...template.ongoingEffects]) {
+    const range = EFFECT_RANGES[`${effect.targetMetric}:${effect.operation}`];
+    if (!range) return "high";
+    const [min, max] = range;
+    const span = max - min;
+    if (span <= 0) continue;
+    let normalized: number;
+    if (effect.operation === "add") {
+      const center = (min + max) / 2;
+      normalized = Math.abs(effect.value - center) / (span / 2);
+    } else {
+      normalized =
+        effect.value >= 1
+          ? (effect.value - 1) / Math.max(max - 1, 1e-9)
+          : (1 - effect.value) / Math.max(1 - min, 1e-9);
+    }
+    worst = Math.max(worst, normalized);
+  }
+  if (worst <= 0.5) return "low";
+  if (worst <= 0.8) return "medium";
+  return "high";
+}

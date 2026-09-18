@@ -10,6 +10,7 @@ import type { EventNotice } from "@/simulation/events/engine";
 import type { EventDetailData } from "@/simulation/events/detail";
 import type { EventTemplate } from "@/simulation/events/types";
 import type { LLMInput } from "@/llm/gateway/summary";
+import type { ChainContextInput, ChainScheduledSpec } from "@/llm/gateway/chain";
 import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 
@@ -33,7 +34,7 @@ export type SimRequest =
   | { type: "intervene"; intervention: UserIntervention } // Step 14
   | { type: "snapshot" } // Step 13
   | { type: "load"; snapshotId: string } // Step 13
-  | { type: "requestLLM" } // Step 11 — 추천 요청 (수동, 추천 전용 모드)
+  | { type: "requestLLM"; mode?: "chain"; eventId?: string } // Step 11 세계 추천 / Step 12 연쇄 추천
   | {
       type: "registerLLMTemplate"; // Step 11 — 사용자가 승인한 후보 등록
       template: EventTemplate;
@@ -42,6 +43,18 @@ export type SimRequest =
       provider: string;
       model: string;
       promptVersion: string;
+    }
+  | {
+      type: "registerChainTemplate"; // Step 12 — 연쇄 후보 등록 (자동 승인 포함)
+      template: EventTemplate;
+      scheduled: ChainScheduledSpec;
+      inputHash: string;
+      rawOutput: string;
+      provider: string;
+      model: string;
+      promptVersion: string;
+      approvedBy: "user" | "automatic";
+      usage?: { promptTokens: number; outputTokens: number; estimatedCost?: number };
     };
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
@@ -145,6 +158,10 @@ export type SimNotification =
       inputHash: string;
       registeredNames: string[];
       tick: number;
+      chain?: {
+        context: ChainContextInput;
+        contextHash: string; // Step 12 — 연쇄 문맥과 해시
+      };
     }
   | {
       type: "llmRegistered"; // 승인 등록 결과

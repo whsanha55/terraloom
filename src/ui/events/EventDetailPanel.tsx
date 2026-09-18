@@ -11,9 +11,14 @@ function percent(value: number): string {
 export function EventDetailPanel({
   detail,
   onClose,
+  onChainRequest,
+  chainLoading = false,
 }: {
   detail: EventDetailData | null;
   onClose: () => void;
+  /** 이 사건의 후속 추천 요청 (Step 12) */
+  onChainRequest?: (eventId: string) => void;
+  chainLoading?: boolean;
 }) {
   if (!detail) {
     return (
@@ -133,6 +138,18 @@ export function EventDetailPanel({
             ))}
           </ul>
         </div>
+      )}
+
+      {detail.status === "active" && onChainRequest && (
+        <button
+          type="button"
+          data-testid="llm-chain-request"
+          onClick={() => onChainRequest(detail.id)}
+          disabled={chainLoading}
+          className="mt-md rounded-md border border-border bg-surface px-md py-xs text-sm font-medium text-text hover:bg-accent disabled:opacity-50"
+        >
+          {chainLoading ? "요청 중…" : "이 사건의 후속 추천 요청 (LLM)"}
+        </button>
       )}
     </section>
   );

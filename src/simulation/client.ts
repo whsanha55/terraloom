@@ -15,6 +15,7 @@ import type {
 import type { EventNotice } from "@/simulation/events/engine";
 import type { EventDetailData } from "@/simulation/events/detail";
 import type { LLMInput } from "@/llm/gateway/summary";
+import type { ChainContextInput, ChainScheduledSpec } from "@/llm/gateway/chain";
 import type { EventTemplate } from "@/simulation/events/types";
 import type { WorldConfig } from "@/world/model/worldConfig";
 
@@ -39,7 +40,13 @@ export interface SimulationClientHandlers {
   onMajorEvent?: (notice: EventNotice, paused: boolean) => void;
   onEventDetail?: (detail: EventDetailData | null) => void;
   onCityDetail?: (detail: CityDetail | null) => void;
-  onLLMRequest?: (input: LLMInput, inputHash: string, registeredNames: string[], tick: number) => void;
+  onLLMRequest?: (
+    input: LLMInput,
+    inputHash: string,
+    registeredNames: string[],
+    tick: number,
+    chain?: { context: ChainContextInput; contextHash: string },
+  ) => void;
   onLLMRegistered?: (result: { ok: boolean; templateId?: string; reason?: string }) => void;
 }
 
@@ -76,7 +83,13 @@ export class SimulationClient {
           handlers.onCityDetail?.(message.detail);
           break;
         case "llmRequest":
-          handlers.onLLMRequest?.(message.input, message.inputHash, message.registeredNames, message.tick);
+          handlers.onLLMRequest?.(
+            message.input,
+            message.inputHash,
+            message.registeredNames,
+            message.tick,
+            message.chain,
+          );
           break;
         case "llmRegistered":
           handlers.onLLMRegistered?.({ ok: message.ok, templateId: message.templateId, reason: message.reason });
@@ -117,6 +130,24 @@ export class SimulationClient {
 
   requestLLM(): void {
     this.send({ type: "requestLLM" });
+  }
+
+  requestLLMChain(eventId: string): void {
+    this.send({ type: "requestLLM", mode: "chain", eventId });
+  }
+
+  registerChainTemplate(payload: {
+    template: EventTemplate;
+    scheduled: ChainScheduledSpec;
+    inputHash: string;
+    rawOutput: string;
+    provider: string;
+    model: string;
+    promptVersion: string;
+    approvedBy: "user" | "automatic";
+    usage?: { promptTokens: number; outputTokens: number; estimatedCost?: number };
+  }): void {
+    this.send({ type: "registerChainTemplate", ...payload });
   }
 
   registerLLMTemplate(payload: LLMRegisterPayload): void {

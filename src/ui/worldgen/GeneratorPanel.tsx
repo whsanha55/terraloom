@@ -20,11 +20,19 @@ import type { EventDetailData } from "@/simulation/events/detail";
 import { EventTimeline } from "@/ui/timeline/EventTimeline";
 import { EventDetailPanel } from "@/ui/events/EventDetailPanel";
 import { CityDetailPanel, type CitySeriesPoint } from "@/ui/events/CityDetailPanel";
-import { RecommendationPanel } from "@/ui/llm/RecommendationPanel";
+import { RecommendationPanel, type LLMAutomation } from "@/ui/llm/RecommendationPanel";
 import { MockLLMProvider, OpenAICompatibleProvider } from "@/llm/gateway/provider";
-import { requestRecommendations, type GatewayResult } from "@/llm/gateway/gateway";
-import type { GatewayCandidate } from "@/llm/gateway/gateway";
+import {
+  requestRecommendations,
+  requestChainRecommendations,
+  type GatewayResult,
+  type ChainGatewayResult,
+  type GatewayCandidate,
+  type ChainGatewayCandidate,
+} from "@/llm/gateway/gateway";
 import { PROMPT_VERSION } from "@/llm/gateway/prompt";
+import { CHAIN_PROMPT_VERSION } from "@/llm/gateway/chain";
+import { classifySafety } from "@/llm/validation/safety";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
 import { StatsChart } from "./StatsChart";
@@ -56,6 +64,12 @@ interface WorldView {
   seaLevel: number;
   attempts: number;
   seaLevelCompensated: boolean;
+}
+
+/** 토큰 추정 — 모의 제공자 기준(글자 수/4). 기록은 추정치로 남는다(§23 usage) */
+function estimateUsage(chars: number) {
+  const tokens = Math.ceil(chars / 4);
+  return { promptTokens: tokens, outputTokens: tokens };
 }
 
 const INITIAL_SUMMARY: WorldSummary = {
@@ -97,6 +111,11 @@ export function GeneratorPanel() {
   const [approvedTemplateIds, setApprovedTemplateIds] = useState<Set<string>>(new Set());
   const [providerMode, setProviderMode] = useState<"mock" | "byok">("mock");
   const [apiKey, setApiKey] = useState(""); // 세션 메모리만 (§30 — 저장 금지)
+  const [automation, setAutomation] = useState<LLMAutomation>("manual");
+  const [chainStatus, setChainStatus] = useState<"idle" | "loading" | "ok" | "fallback">("idle");
+  const [chainResult, setChainResult] = useState<ChainGatewayResult | null>(null);
+  const [chainHash, setChainHash] = useState<string | null>(null);
+  const [chainParentName, setChainParentName] = useState<string | null>(null);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +123,8 @@ export function GeneratorPanel() {
   const watchModeRef = useRef(false);
   const providerModeRef = useRef<"mock" | "byok">("mock");
   const apiKeyRef = useRef("");
+  const automationRef = useRef<LLMAutomation>("manual");
+  const lastAutoLLMTickRef = useRef(-Infinity); // §17 호출 빈도 제한 (5년)
   useEffect(() => {
     watchModeRef.current = watchMode;
   }, [watchMode]);
@@ -113,6 +134,9 @@ export function GeneratorPanel() {
   useEffect(() => {
     apiKeyRef.current = apiKey;
   }, [apiKey]);
+  useEffect(() => {
+    automationRef.current = automation;
+  }, [automation]);
 
   useEffect(() => {
     const client = new SimulationClient({
@@ -148,6 +172,15 @@ export function GeneratorPanel() {
       onMajorEvent: (notice) => {
         setMajorEvent(notice);
         setPauseReason(`사건 정지: ${notice.name}`);
+        // §17 호출 조건 — 중요 사건 직후 자동 연쇄 추천 (자동화 켜짐 + 빈도 제한 60틱)
+        if (
+          automationRef.current !== "manual" &&
+          notice.scope === "settlement" &&
+          notice.startedTick - lastAutoLLMTickRef.current >= 60
+        ) {
+          lastAutoLLMTickRef.current = notice.startedTick;
+          clientRef.current?.requestLLMChain(notice.id);
+        }
         // Watch Mode — 카메라 이동(자동 선택) + 상세 패널 open (§25)
         if (watchModeRef.current) {
           setSelectedEventId(notice.id);
@@ -161,9 +194,7 @@ export function GeneratorPanel() {
       },
       onEventDetail: (detail) => setEventDetail(detail),
       onCityDetail: (detail) => setCityDetail(detail),
-      onLLMRequest: async (input, inputHash, registeredNames) => {
-        setLlmInputHash(inputHash);
-        setLlmStatus("loading");
+      onLLMRequest: async (input, inputHash, registeredNames, _tick, chain) => {
         const provider =
           providerModeRef.current === "byok" && apiKeyRef.current.trim() !== ""
             ? new OpenAICompatibleProvider({
@@ -172,6 +203,42 @@ export function GeneratorPanel() {
                 model: "gpt-4o-mini",
               })
             : new MockLLMProvider();
+        if (chain) {
+          // 연쇄 추천 (Step 12) — 후보 등록 후 규칙 엔진이 발생 확률을 계산한다
+          setChainStatus("loading");
+          setChainParentName(chain.context.parent.name);
+          const chainResult = await requestChainRecommendations(
+            provider,
+            chain.context,
+            new Set(registeredNames),
+          );
+          setChainHash(chain.contextHash);
+          setChainResult(chainResult);
+          setChainStatus(chainResult.status);
+          // 자동 승인 (§21.2) — semi는 낮은 영향만, auto는 검증된 후보 전부
+          const mode = automationRef.current;
+          if (chainResult.status === "ok" && mode !== "manual") {
+            for (const candidate of chainResult.candidates) {
+              const template = candidate.validation.template;
+              if (!template || !candidate.validation.scheduled) continue;
+              if (mode === "semi" && classifySafety(template) !== "low") continue;
+              clientRef.current?.registerChainTemplate({
+                template,
+                scheduled: candidate.validation.scheduled,
+                inputHash: chain.contextHash,
+                rawOutput: chainResult.rawOutput,
+                provider: chainResult.provider,
+                model: chainResult.model,
+                promptVersion: CHAIN_PROMPT_VERSION,
+                approvedBy: "automatic",
+                usage: estimateUsage(chainResult.rawOutput.length * 4),
+              });
+            }
+          }
+          return;
+        }
+        setLlmInputHash(inputHash);
+        setLlmStatus("loading");
         const result = await requestRecommendations(provider, input, new Set(registeredNames));
         setLlmResult(result);
         setLlmStatus(result.status);
@@ -224,6 +291,11 @@ export function GeneratorPanel() {
       setLlmResult(null);
       setLlmInputHash(null);
       setApprovedTemplateIds(new Set());
+      setChainStatus("idle");
+      setChainResult(null);
+      setChainHash(null);
+      setChainParentName(null);
+      lastAutoLLMTickRef.current = -Infinity;
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -281,6 +353,28 @@ export function GeneratorPanel() {
   const handleLLMRequest = () => {
     setLlmStatus("loading");
     clientRef.current?.requestLLM();
+  };
+
+  const handleChainRequest = (eventId: string) => {
+    setChainStatus("loading");
+    clientRef.current?.requestLLMChain(eventId);
+  };
+
+  const handleChainApprove = (candidate: ChainGatewayCandidate) => {
+    const template = candidate.validation.template;
+    const scheduled = candidate.validation.scheduled;
+    if (!template || !scheduled || !chainHash || !chainResult) return;
+    clientRef.current?.registerChainTemplate({
+      template,
+      scheduled,
+      inputHash: chainHash,
+      rawOutput: chainResult.rawOutput,
+      provider: chainResult.provider,
+      model: chainResult.model,
+      promptVersion: CHAIN_PROMPT_VERSION,
+      approvedBy: "user",
+      usage: estimateUsage(chainResult.rawOutput.length * 4),
+    });
   };
 
   const handleLLMApprove = (candidate: GatewayCandidate) => {
@@ -469,6 +563,8 @@ export function GeneratorPanel() {
                 setSelectedEventId(null);
                 setEventDetail(null);
               }}
+              onChainRequest={handleChainRequest}
+              chainLoading={chainStatus === "loading"}
             />
           </div>
 
@@ -483,6 +579,12 @@ export function GeneratorPanel() {
               onProviderModeChange={setProviderMode}
               apiKey={apiKey}
               onApiKeyChange={setApiKey}
+              automation={automation}
+              onAutomationChange={setAutomation}
+              chainStatus={chainStatus}
+              chainResult={chainResult}
+              chainParentName={chainParentName}
+              onChainApprove={handleChainApprove}
               onRequest={handleLLMRequest}
               onApprove={handleLLMApprove}
             />

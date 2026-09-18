@@ -10,8 +10,40 @@ import { EventEngine } from "@/simulation/events/engine";
 import type { EventTemplate } from "@/simulation/events/types";
 import type { WorldState } from "@/simulation/core/worldState";
 import { summarizeForLLM, computeInputHash } from "./gateway/summary";
+import {
+  computeChainContextHash,
+  summarizeChainContext,
+  type ChainScheduledSpec,
+} from "./gateway/chain";
 import { validateCandidate, registeredTemplateNames } from "./validation/safety";
 import type { LLMRecommendation } from "./schemas/recommendation";
+
+/** 토큰·비용 기록 (Step 12) — 추정치. BYOK 요금이 적용된 실측은 Step 12 범위 밖 */
+export interface LLMUsage {
+  promptTokens: number;
+  outputTokens: number;
+  estimatedCost?: number;
+}
+
+export interface ResolvedUsage {
+  promptTokens: number;
+  outputTokens: number;
+  estimatedCost: number;
+}
+
+/** 1K 토큰당 추정 단가(USD) — 참고용 상수 */
+const ESTIMATED_COST_PER_1K_TOKENS = 0.0005;
+
+function normalizeUsage(usage: LLMUsage | undefined): ResolvedUsage | undefined {
+  if (!usage) return undefined;
+  return {
+    promptTokens: usage.promptTokens,
+    outputTokens: usage.outputTokens,
+    estimatedCost:
+      usage.estimatedCost ??
+      Number((((usage.promptTokens + usage.outputTokens) / 1000) * ESTIMATED_COST_PER_1K_TOKENS).toFixed(6)),
+  };
+}
 
 export interface LLMGenerationRecord {
   id: string;
@@ -28,6 +60,7 @@ export interface LLMGenerationRecord {
   branchId: string;
   registrationOrder: number;
   requestSnapshotId: string;
+  usage?: ResolvedUsage;
 }
 
 export interface RegisterLLMPayload {
@@ -37,6 +70,12 @@ export interface RegisterLLMPayload {
   provider: string;
   model: string;
   promptVersion: string;
+  usage?: LLMUsage;
+}
+
+export interface RegisterChainPayload extends RegisterLLMPayload {
+  scheduled: ChainScheduledSpec;
+  approvedBy: "user" | "automatic";
 }
 
 export interface RegisterResult {
@@ -122,7 +161,57 @@ export function registerLLMTemplate(
     branchId: "main",
     registrationOrder: order,
     requestSnapshotId: payload.inputHash,
+    usage: normalizeUsage(payload.usage),
   };
   state.llmRecords.push(record);
+  return { ok: true, templateId: payload.template.id };
+}
+
+/**
+ * 승인된 연쇄 후보 등록 (Step 12) — 템플릿 등록 + 예정 후보(지연·만료·가중치) 등록.
+ * 부모 사건이 종료돼 문맥 해시를 재현할 수 없으면 폐기한다(§23 늦은 응답).
+ * 실제 발생 확률은 규칙 엔진이 계산한다 — 여기서는 후보만 만든다.
+ */
+export function registerChainTemplate(
+  state: WorldState,
+  eventEngine: EventEngine,
+  payload: RegisterChainPayload,
+): RegisterResult {
+  const ctx = summarizeChainContext(state, eventEngine.registry, payload.scheduled.causedByEventId);
+  if (!ctx) {
+    return { ok: false, reason: "늦은 응답 폐기 — 근거 사건이 이미 종료되었습니다 (§23)" };
+  }
+  if (payload.inputHash !== computeChainContextHash(ctx)) {
+    return { ok: false, reason: "늦은 응답 폐기 — 문맥이 변했습니다. 다시 추천을 요청하세요 (§23)" };
+  }
+  if (eventEngine.registry.has(payload.template.id)) {
+    return { ok: false, reason: `이미 등록된 템플릿입니다: ${payload.template.id}` };
+  }
+  const result = registerLLMTemplate(state, eventEngine, {
+    template: payload.template,
+    inputHash: computeCurrentInputHash(state),
+    rawOutput: payload.rawOutput,
+    provider: payload.provider,
+    model: payload.model,
+    promptVersion: payload.promptVersion,
+    usage: payload.usage,
+  });
+  if (!result.ok) return result;
+  // approvedBy 갱신 — 연쇄 자동 등록은 "automatic" (§21.2)
+  const record = state.llmRecords[state.llmRecords.length - 1];
+  if (record) record.approvedBy = payload.approvedBy;
+
+  const parent = state.activeEvents.find((e) => e.id === payload.scheduled.causedByEventId);
+  state.scheduledEvents.push({
+    id: `sch:${payload.scheduled.causedByEventId}:llm:${payload.template.id}`,
+    templateId: payload.template.id,
+    targetId: payload.scheduled.targetId,
+    activateAtTick: state.clock.currentTick + payload.scheduled.minDelayTicks,
+    expiresAtTick: state.clock.currentTick + payload.scheduled.maxDelayTicks,
+    baseWeight: payload.scheduled.chainWeight,
+    chainDepth: (parent?.chainDepth ?? 0) + 1,
+    causedByEventId: payload.scheduled.causedByEventId,
+    conditions: [],
+  });
   return { ok: true, templateId: payload.template.id };
 }
