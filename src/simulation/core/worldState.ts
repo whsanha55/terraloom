@@ -19,7 +19,15 @@ import type {
   ScheduledWorldEvent,
 } from "@/simulation/events/types";
 import type { LLMGenerationRecord } from "@/llm/records";
-import type { SimSpeed } from "@/workers/protocol";
+import type { SimSpeed, UserIntervention } from "@/workers/protocol";
+
+/** 도시 단위 정책 (§24.2) — 기본 1 (중립) */
+export interface SettlementPolicies {
+  /** 이민 개방도 — 이주 유출 배율 */
+  migrationOpenness: number;
+  /** 교역 우선순위 — 잉여 식량 이동 분율 배율 */
+  tradePriority: number;
+}
 
 export interface SimulationClock {
   currentTick: number;
@@ -55,6 +63,8 @@ export interface SettlementState {
   areaFertility: number;
   areaRiverVolume: number;
   areaBiomeCounts: number[];
+  /** 정책 (§24.2) */
+  policies: SettlementPolicies;
 }
 
 export interface GlobalStatistics {
@@ -86,6 +96,10 @@ export interface WorldState {
   llmRecords: LLMGenerationRecord[];
   /** 등록된 LLM 템플릿 — 스냅숏·복원 대상(재호출 없이 재사용 §23) */
   llmTemplates: import("@/simulation/events/types").EventTemplate[];
+  /** 사용자 개입 기록 (§24 — 재현 입력) */
+  interventions: UserIntervention[];
+  /** 개입 예산 포인트 (§1.2 제한된 자원) */
+  interventionPoints: number;
   globalStatistics: GlobalStatistics;
   /** 인구 변화 원장(§8.3) — 스냅샷·상태 해시 포함 */
   changeLedger: ChangeLedger;
@@ -93,6 +107,9 @@ export interface WorldState {
 
 /** 초기 비축 — 시작 시 3개월분 식량으로 시작한다 */
 export const INITIAL_FOOD_STOCK_MONTHS = 3;
+
+/** 개입 예산 — 제한된 자원으로 문제에 대응한다 (§1.2) */
+export const INITIAL_INTERVENTION_POINTS = 2000;
 
 export function initializeWorldState(gen: WorldGenResult): WorldState {
   const { map, config } = gen;
@@ -133,6 +150,7 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
       areaFertility: area.fertility,
       areaRiverVolume: area.riverVolume,
       areaBiomeCounts: area.biomeCounts,
+      policies: { migrationOpenness: 1, tradePriority: 1 },
     };
   }
 
@@ -169,6 +187,8 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
     probabilityEvaluations: [],
     llmRecords: [],
     llmTemplates: [],
+    interventions: [],
+    interventionPoints: INITIAL_INTERVENTION_POINTS,
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

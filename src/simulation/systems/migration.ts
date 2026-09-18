@@ -74,7 +74,11 @@ export function runMigration(state: WorldState): MigrationFlow[] {
     pressure.set(settlement.id, p);
     settlement.migrationPressure = p;
     attractiveness.set(settlement.id, computeAttractiveness(settlement));
-    desired.set(settlement.id, Math.max(0, Math.round(settlement.population * p * MIGRATION_RATE)));
+    // 이민 개방도 정책(§24.2) — 유출 배율. 도착 인구의 같은 달 재이동 금지는 유지
+    desired.set(
+      settlement.id,
+      Math.max(0, Math.round(settlement.population * p * MIGRATION_RATE * settlement.policies.migrationOpenness)),
+    );
   }
 
   const byId = new Map(active.map((s) => [s.id, s]));

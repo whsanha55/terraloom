@@ -36,6 +36,7 @@ export function makeSettlement(
     areaFertility: 0.6,
     areaRiverVolume: 0,
     areaBiomeCounts: grasslandCounts(),
+    policies: { migrationOpenness: 1, tradePriority: 1 },
     unmetRatio: 0,
     foodMonthsRemaining: 3,
     ...overrides,
@@ -85,6 +86,8 @@ export function makeWorld(
     probabilityEvaluations: [],
     llmRecords: [],
     llmTemplates: [],
+    interventions: [],
+    interventionPoints: 2000,
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

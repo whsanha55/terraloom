@@ -75,6 +75,8 @@ export interface WorldSummary {
   migrationTotal: number;
   paused: boolean;
   speed: SimSpeed;
+  /** 개입 예산 (§24 — 제한된 자원) */
+  interventionPoints: number;
 }
 
 export interface StateChange {
@@ -174,6 +176,14 @@ export type SimNotification =
       reason?: string;
     }
   | { type: "snapshotSaved"; snapshotId: string; tick: number; branchId: string } // Step 13
+  | {
+      type: "interventionResult"; // Step 14 — 개입 적용 결과 (§27.6 확인 문구)
+      ok: boolean;
+      description: string;
+      reason?: string;
+      cost: number;
+      remainingPoints: number;
+    }
   | {
       type: "snapshotList";
       snapshots: Array<{ id: string; tick: number; branchId: string; label: string }>;

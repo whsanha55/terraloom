@@ -54,6 +54,13 @@ export interface SimulationClientHandlers {
   onWorldRestored?: (result: { branchId: string; tick: number }) => void;
   onBranchComparison?: (comparison: BranchComparison) => void;
   onBranchList?: (branches: Array<{ id: string; name: string; parentBranchId: string; createdAtTick: number }>) => void;
+  onInterventionResult?: (result: {
+    ok: boolean;
+    description: string;
+    reason?: string;
+    cost: number;
+    remainingPoints: number;
+  }) => void;
 }
 
 export class SimulationClient {
@@ -114,6 +121,15 @@ export class SimulationClient {
           break;
         case "branchList":
           handlers.onBranchList?.(message.branches);
+          break;
+        case "interventionResult":
+          handlers.onInterventionResult?.({
+            ok: message.ok,
+            description: message.description,
+            reason: message.reason,
+            cost: message.cost,
+            remainingPoints: message.remainingPoints,
+          });
           break;
         default:
           break;
@@ -193,6 +209,16 @@ export class SimulationClient {
 
   listBranches(): void {
     this.send({ type: "listBranches" });
+  }
+
+  intervene(intervention: {
+    id: string;
+    tick: number;
+    type: string;
+    targetIds: string[];
+    parameters: Record<string, number | string | boolean>;
+  }): void {
+    this.send({ type: "intervene", intervention });
   }
 
   dispose(): void {

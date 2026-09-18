@@ -27,6 +27,7 @@ import { generateWorld } from "@/world/generation/generator";
 import { IndexedDbBackend, WorldStore } from "@/storage/worldStore";
 import { SnapshotQueue } from "@/simulation/snapshots/queue";
 import { buildBranchState, compareSnapshots, type LLMPolicy } from "@/simulation/core/branch";
+import { applyIntervention } from "@/simulation/systems/interventions";
 import type {
   CityDetail,
   Season,
@@ -111,6 +112,7 @@ function buildSummary(): WorldSummary {
     migrationTotal: lastFlowsTotal(),
     paused,
     speed,
+    interventionPoints: engine.state.interventionPoints,
   };
 }
 
@@ -412,6 +414,21 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
     case "cityDetail":
       post({ type: "cityDetailResult", detail: buildCityDetail(request.settlementId) });
       break;
+    case "intervene":
+      if (!engine) break;
+      {
+        const effect = applyIntervention(engine.state, request.intervention, engine.eventEngine);
+        post({
+          type: "interventionResult",
+          ok: effect.ok,
+          description: effect.description,
+          reason: effect.reason,
+          cost: effect.cost,
+          remainingPoints: engine.state.interventionPoints,
+        });
+        emitTickBatch(engine.state.clock.currentTick, engine.state.clock.currentTick);
+      }
+      break;
     case "setMajorThreshold":
       majorThreshold = Math.max(0, Math.min(100, request.threshold));
       break;
@@ -589,12 +606,9 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
         }
       }
       break;
-    default:
-      post({
-        type: "systemStatus",
-        level: "info",
-        code: "not_implemented",
-        message: `요청 ${request.type}은 이후 Step에서 구현됩니다`,
-      });
+    default: {
+      const exhaustive: never = request;
+      void exhaustive;
+    }
   }
 };

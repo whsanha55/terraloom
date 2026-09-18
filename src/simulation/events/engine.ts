@@ -546,6 +546,49 @@ export class EventEngine {
     this.registry.delete(template.id);
     this.isolatedTemplates.set(template.id, reason);
   }
+
+  /** 사건 강제 발생 (§24.3 세계 편집 / Step 14 개입) — 즉시 효과·후보 등록 포함 */
+  forceStart(state: WorldState, templateId: string, targetId: string, tick: number): ActiveWorldEvent | null {
+    const template = this.registry.get(templateId);
+    if (!template) return null;
+    if (template.kind === "notification") return null; // 통지형은 강제 발생 대상이 아님
+    const target =
+      template.scope === "route"
+        ? ({ kind: "route", id: targetId } as const)
+        : ({ kind: "settlement", id: targetId } as const);
+    const duration = rollDuration(state, template, targetId);
+    const event: ActiveWorldEvent = {
+      id: `evt:${template.id}:${targetId}:${tick}`,
+      templateId: template.id,
+      templateVersion: template.version,
+      targetId,
+      scope: template.scope,
+      importance: template.importance,
+      startedTick: tick,
+      durationTicks: duration,
+      endsAtTick: tick + duration,
+      chainDepth: 0,
+    };
+    this.createEvent(state, template, target, event);
+    return event;
+  }
+
+  /** 사건 강제 종료 (§24.1 재난 대응) — 종료 처리·쿨다운 설정 포함 */
+  forceEnd(state: WorldState, eventId: string): boolean {
+    const event = state.activeEvents.find((e) => e.id === eventId);
+    if (!event) return false;
+    const template = this.registry.get(event.templateId);
+    const target =
+      event.scope === "route"
+        ? ({ kind: "route", id: event.targetId } as const)
+        : ({ kind: "settlement", id: event.targetId } as const);
+    if (template) {
+      for (const effect of template.resolutionEffects) applyEffect(state, target, effect);
+    }
+    this.finalize(state, event, state.clock.currentTick, template?.cooldownTicks ?? 0);
+    state.activeEvents = state.activeEvents.filter((e) => e.id !== eventId);
+    return true;
+  }
 }
 
 /** 인과 체인 위쪽에 해당 템플릿이 이미 있는지 — 순환 탐지 (§14.1) */

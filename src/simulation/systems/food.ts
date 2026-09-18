@@ -106,12 +106,10 @@ export function runFoodSettlement(state: WorldState, options: FoodSystemOptions 
       receiverId = aId;
     }
     if (donorId === null || receiverId === null) continue;
+    const donor = state.settlements[donorId];
+    const tradeFraction = TRADE_FRACTION * (donor?.policies.tradePriority ?? 1);
     const capacity = ROUTE_CAPACITY * (options.routeCapacityMultiplier?.(routeId) ?? 1);
-    const amount = Math.min(
-      (surplus.get(donorId) ?? 0) * TRADE_FRACTION,
-      deficit.get(receiverId) ?? 0,
-      capacity,
-    );
+    const amount = Math.min((surplus.get(donorId) ?? 0) * tradeFraction, deficit.get(receiverId) ?? 0, capacity);
     if (amount <= 0) continue;
     surplus.set(donorId, (surplus.get(donorId) ?? 0) - amount);
     deficit.set(receiverId, (deficit.get(receiverId) ?? 0) - amount);

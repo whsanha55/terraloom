@@ -22,6 +22,7 @@ import { EventDetailPanel } from "@/ui/events/EventDetailPanel";
 import { CityDetailPanel, type CitySeriesPoint } from "@/ui/events/CityDetailPanel";
 import { RecommendationPanel, type LLMAutomation } from "@/ui/llm/RecommendationPanel";
 import { SnapshotPanel, type SnapshotEntry } from "@/ui/branches/SnapshotPanel";
+import { InterventionPanel, type InterventionLogEntry } from "@/ui/interventions/InterventionPanel";
 import type { BranchComparison, LLMPolicy } from "@/simulation/core/branch";
 import { MockLLMProvider, OpenAICompatibleProvider } from "@/llm/gateway/provider";
 import {
@@ -84,6 +85,7 @@ const INITIAL_SUMMARY: WorldSummary = {
   migrationTotal: 0,
   paused: true,
   speed: 1,
+  interventionPoints: 2000,
 };
 
 export function GeneratorPanel() {
@@ -124,6 +126,7 @@ export function GeneratorPanel() {
   const [comparison, setComparison] = useState<BranchComparison | null>(null);
   const [compareAId, setCompareAId] = useState("");
   const [compareBId, setCompareBId] = useState("");
+  const [interventionLog, setInterventionLog] = useState<InterventionLogEntry[]>([]);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -133,6 +136,10 @@ export function GeneratorPanel() {
   const apiKeyRef = useRef("");
   const automationRef = useRef<LLMAutomation>("manual");
   const lastAutoLLMTickRef = useRef(-Infinity); // §17 호출 빈도 제한 (5년)
+  const summaryRef = useRef(INITIAL_SUMMARY);
+  useEffect(() => {
+    summaryRef.current = summary;
+  }, [summary]);
   useEffect(() => {
     watchModeRef.current = watchMode;
   }, [watchMode]);
@@ -281,6 +288,17 @@ export function GeneratorPanel() {
         void result;
       },
       onBranchComparison: (result) => setComparison(result),
+      onInterventionResult: (result) => {
+        setInterventionLog((prev) => [
+          ...prev,
+          {
+            id: `log:${result.description}:${prev.length}`,
+            ok: result.ok,
+            description: result.ok ? result.description : (result.reason ?? "알 수 없는 실패"),
+            tick: summaryRef.current.tick,
+          },
+        ]);
+      },
     });
     clientRef.current = client;
     return () => {
@@ -334,6 +352,7 @@ export function GeneratorPanel() {
       setComparison(null);
       setCompareAId("");
       setCompareBId("");
+      setInterventionLog([]);
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -386,6 +405,16 @@ export function GeneratorPanel() {
     setSelectedSettlementId(settlementId);
     setSelectedCell(null);
     clientRef.current?.requestCityDetail(settlementId);
+  };
+
+  const handleIntervene = (intervention: {
+    id: string;
+    tick: number;
+    type: string;
+    targetIds: string[];
+    parameters: Record<string, number | string | boolean>;
+  }) => {
+    clientRef.current?.intervene(intervention);
   };
 
   const handleSave = () => {
@@ -621,6 +650,24 @@ export function GeneratorPanel() {
           </div>
 
           <StatsChart history={stats} />
+
+          <div className="mt-md">
+            <InterventionPanel
+              settlements={
+                world
+                  ? world.settlements.map((settlement) => ({
+                      id: settlement.id,
+                      name: settlement.name,
+                      status: liveSettlements[settlement.id]?.status ?? "active",
+                    }))
+                  : []
+              }
+              interventionPoints={summary.interventionPoints}
+              currentTick={summary.tick}
+              log={interventionLog}
+              onIntervene={handleIntervene}
+            />
+          </div>
 
           <div className="mt-md">
             <SnapshotPanel
