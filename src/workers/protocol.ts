@@ -38,6 +38,7 @@ export type SimRequest =
   | { type: "restoreSnapshot"; snapshotId: string; llmPolicy: LLMPolicy; asBranch: boolean; name?: string } // Step 13
   | { type: "compareSnapshots"; snapshotAId: string; snapshotBId: string } // Step 13
   | { type: "listBranches" } // Step 13
+  | { type: "listEventTemplates" } // Step 14 — 개입(사건 직접 발생) 대상 템플릿 목록
   | { type: "requestLLM"; mode?: "chain"; eventId?: string } // Step 11 세계 추천 / Step 12 연쇄 추천
   | {
       type: "registerLLMTemplate"; // Step 11 — 사용자가 승인한 후보 등록
@@ -94,8 +95,8 @@ export interface SettlementSnapshot {
   stability: number;
   migrationPressure: number;
   diseaseLevel: number;
-  /** 활성 사건 (§14.1 도시별 최대 3) — 지도 다이아몬드·도시 상세용 */
-  activeEvents: Array<{ id: string; name: string; importance: number }>;
+  /** 활성 사건 (§14.1 도시별 최대 3) — 지도 다이아몬드·도시 상세·재난 대응 비용 미리보기용 */
+  activeEvents: Array<{ id: string; name: string; importance: number; category: string }>;
 }
 
 /** 도시 상세 — 원장 기반 인구 변화 원인 분해(§2.1) 포함 */
@@ -200,4 +201,5 @@ export type SimNotification =
       code: string;
       message: string;
     }
+  | { type: "eventTemplateList"; templates: Array<{ id: string; name: string }> } // Step 14
   | { type: "progress"; phase: string; percent: number };

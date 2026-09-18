@@ -135,6 +135,7 @@ export function GeneratorPanel() {
   const [compareBId, setCompareBId] = useState("");
   const [interventionLog, setInterventionLog] = useState<InterventionLogEntry[]>([]);
   const [systemStatuses, setSystemStatuses] = useState<SystemStatusEntry[]>([]);
+  const [eventTemplates, setEventTemplates] = useState<Array<{ id: string; name: string }>>([]);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
   const statusSeqRef = useRef(0);
@@ -270,6 +271,7 @@ export function GeneratorPanel() {
       onLLMRegistered: (result) => {
         if (result.ok && result.templateId) {
           setApprovedTemplateIds((prev) => new Set([...prev, result.templateId!]));
+          clientRef.current?.listEventTemplates(); // 개입 대상 목록에도 등록된다
         }
       },
       onSnapshotSaved: () => {
@@ -281,6 +283,7 @@ export function GeneratorPanel() {
         setCompareAId((prev) => (prev === "" && list.length > 0 ? list[0]!.id : prev));
         setCompareBId((prev) => (prev === "" && list.length > 1 ? list[list.length - 1]!.id : prev));
       },
+      onEventTemplateList: (templates) => setEventTemplates(templates),
       onSystemStatus: (notification) => {
         // §22.1 — worker 오류·거부를 사용자에게 보인다 (swallow 금지)
         if (notification.code === "llm_chain_no_context") {
@@ -303,7 +306,9 @@ export function GeneratorPanel() {
         setPauseReason(null);
         setLlmStatus("idle");
         setLlmResult(null);
+        setSystemStatuses([]);
         clientRef.current?.listSnapshots();
+        clientRef.current?.listEventTemplates();
         void result;
       },
       onBranchComparison: (result) => setComparison(result),
@@ -372,6 +377,8 @@ export function GeneratorPanel() {
       setCompareAId("");
       setCompareBId("");
       setInterventionLog([]);
+      setSystemStatuses([]);
+      client.listEventTemplates(); // 개입(사건 직접 발생) 대상 — worker 레지스트리 기준
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -707,12 +714,18 @@ export function GeneratorPanel() {
                       id: settlement.id,
                       name: settlement.name,
                       status: liveSettlements[settlement.id]?.status ?? "active",
+                      naturalDisasterCount:
+                        liveSettlements[settlement.id]?.activeEvents.filter(
+                          (event) => event.category === "natural",
+                        ).length ?? 0,
                     }))
                   : []
               }
               interventionPoints={summary.interventionPoints}
               currentTick={summary.tick}
               log={interventionLog}
+              eventTemplates={eventTemplates}
+              onRequestTemplates={() => clientRef.current?.listEventTemplates()}
               onIntervene={handleIntervene}
             />
           </div>

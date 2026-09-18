@@ -134,6 +134,7 @@ function settlementSnapshots(): SettlementSnapshot[] {
         id: e!.id,
         name: engine!.eventEngine.registry.get(e!.templateId)?.name ?? e!.templateId,
         importance: e!.importance,
+        category: engine!.eventEngine.registry.get(e!.templateId)?.category ?? "social",
       })),
   }));
 }
@@ -434,16 +435,33 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
       break;
     case "snapshot":
       if (!engine) break;
-      scheduleSnapshot(request.label === "user" ? "user" : "auto");
-      // 실제 저장 완료 후 통지 — 목록 조회 경쟁 방지
-      void snapshotQueue?.flushAll().then(() => {
-        post({
-          type: "snapshotSaved",
-          snapshotId: `snap:${worldKey}:${engine!.state.branchId}:${engine!.state.clock.currentTick}`,
-          tick: engine!.state.clock.currentTick,
-          branchId: engine!.state.branchId,
+      {
+        // 요청 시점의 틱·분기를 통지에 그대로 쓴다 — flush 완료 시점 값과 어긋나지 않게
+        const tick = engine.state.clock.currentTick;
+        const branchId = engine.state.branchId;
+        scheduleSnapshot(request.label === "user" ? "user" : "auto");
+        // 실제 저장 완료 후 통지 — 목록 조회 경쟁 방지.
+        // flushAll은 진행 중 flush 뒤에 체인되므로 resolve 시점엔 이 요청이 저장돼 있다
+        void snapshotQueue?.flushAll().then(() => {
+          post({
+            type: "snapshotSaved",
+            snapshotId: `snap:${worldKey}:${branchId}:${tick}`,
+            tick,
+            branchId,
+          });
         });
-      });
+      }
+      break;
+    case "listEventTemplates":
+      if (!engine) break;
+      {
+        // 개입(사건 직접 발생) 대상 — 런타임 레지스트리 기준 (격리 제외·LLM 등록 포함)
+        const templates = [...engine.eventEngine.registry.values()]
+          .filter((t) => t.kind === "effect" && t.scope === "settlement")
+          .sort((a, b) => (a.id < b.id ? -1 : 1))
+          .map((t) => ({ id: t.id, name: t.name }));
+        post({ type: "eventTemplateList", templates });
+      }
       break;
     case "listSnapshots":
       void (async () => {

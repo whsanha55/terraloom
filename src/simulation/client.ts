@@ -51,6 +51,7 @@ export interface SimulationClientHandlers {
   onLLMRegistered?: (result: { ok: boolean; templateId?: string; reason?: string }) => void;
   onSnapshotSaved?: (result: { snapshotId: string; tick: number; branchId: string }) => void;
   onSnapshotList?: (snapshots: Array<{ id: string; tick: number; branchId: string; label: string }>) => void;
+  onEventTemplateList?: (templates: Array<{ id: string; name: string }>) => void;
   onWorldRestored?: (result: { branchId: string; tick: number }) => void;
   onBranchComparison?: (comparison: BranchComparison) => void;
   onBranchList?: (branches: Array<{ id: string; name: string; parentBranchId: string; createdAtTick: number }>) => void;
@@ -112,6 +113,9 @@ export class SimulationClient {
           break;
         case "snapshotList":
           handlers.onSnapshotList?.(message.snapshots);
+          break;
+        case "eventTemplateList":
+          handlers.onEventTemplateList?.(message.templates);
           break;
         case "worldRestored":
           handlers.onWorldRestored?.({ branchId: message.branchId, tick: message.tick });
@@ -197,6 +201,11 @@ export class SimulationClient {
 
   listSnapshots(): void {
     this.send({ type: "listSnapshots" });
+  }
+
+  /** 개입(사건 직접 발생) 대상 템플릿 목록 — worker 레지스트리 기준 */
+  listEventTemplates(): void {
+    this.send({ type: "listEventTemplates" });
   }
 
   restoreSnapshot(snapshotId: string, options: { llmPolicy: LLMPolicy; asBranch: boolean; name?: string }): void {

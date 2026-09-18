@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { HandHeart } from "lucide-react";
-import { INTERVENTION_TYPES } from "@/simulation/systems/interventions";
-import { BUILTIN_TEMPLATES } from "@/simulation/events/templates/builtin";
+import { estimateInterventionCost, INTERVENTION_TYPES } from "@/simulation/systems/interventions";
 
 export interface InterventionLogEntry {
   id: string;
@@ -13,10 +12,20 @@ export interface InterventionLogEntry {
 }
 
 interface InterventionPanelProps {
-  settlements: Array<{ id: string; name: string; status: "active" | "ruined" }>;
+  settlements: Array<{
+    id: string;
+    name: string;
+    status: "active" | "ruined";
+    /** 활성 자연재해 건수 — 재난 대응 비용 미리보기용 (worker 카테고리 기준) */
+    naturalDisasterCount: number;
+  }>;
   interventionPoints: number;
   currentTick: number;
   log: InterventionLogEntry[];
+  /** 사건 직접 발생 대상 — worker 레지스트리의 현재 목록 (격리 제외·LLM 등록 포함) */
+  eventTemplates: Array<{ id: string; name: string }>;
+  /** 템플릿 목록 갱신 요청 — 드롭다운 포커스 시 호출 */
+  onRequestTemplates: () => void;
   onIntervene: (intervention: {
     id: string;
     tick: number;
@@ -34,6 +43,8 @@ export function InterventionPanel({
   interventionPoints,
   currentTick,
   log,
+  eventTemplates,
+  onRequestTemplates,
   onIntervene,
 }: InterventionPanelProps) {
   const [type, setType] = useState<(typeof TYPES)[number]>("foodAid");
@@ -41,21 +52,31 @@ export function InterventionPanel({
   const [months, setMonths] = useState(3);
   const [openness, setOpenness] = useState(1);
   const [priority, setPriority] = useState(1);
-  const [templateId, setTemplateId] = useState("drought");
+  const [templateId, setTemplateId] = useState("");
 
   const active = settlements.filter((s) => s.status === "active");
-  const effectiveTarget = active.some((s) => s.id === targetId) ? targetId : (active[0]?.id ?? "");
-  const definition = INTERVENTION_TYPES[type];
-  const costPreview =
-    type === "foodAid" && definition ? definition.baseCost * months : (definition?.baseCost ?? 0);
+  const effectiveTargetEntry =
+    active.find((s) => s.id === targetId) ?? active[0];
+  const effectiveTarget = effectiveTargetEntry?.id ?? "";
+  // 엔진과 동일 공식 (§24) — months clamp(1~24)·자연재해 건수 포함
+  const costPreview = estimateInterventionCost(type, {
+    months,
+    naturalDisasterCount: effectiveTargetEntry?.naturalDisasterCount ?? 0,
+  });
+  const effectiveTemplateId = eventTemplates.some((t) => t.id === templateId)
+    ? templateId
+    : (eventTemplates[0]?.id ?? "");
+  const disasterBlocked =
+    type === "disasterResponse" && (effectiveTargetEntry?.naturalDisasterCount ?? 0) === 0;
 
   const handleRun = () => {
     if (!effectiveTarget) return;
+    if (type === "triggerEvent" && !effectiveTemplateId) return;
     const parameters: Record<string, number | string | boolean> = {};
     if (type === "foodAid") parameters.months = months;
     if (type === "migrationPolicy") parameters.openness = openness;
     if (type === "tradePriority") parameters.priority = priority;
-    if (type === "triggerEvent") parameters.templateId = templateId;
+    if (type === "triggerEvent") parameters.templateId = effectiveTemplateId;
     onIntervene({
       id: `itv:${type}:${currentTick}:${log.length + 1}`,
       tick: currentTick,
@@ -75,7 +96,7 @@ export function InterventionPanel({
         <h2 className="text-sm font-semibold text-text">개입 (What-if 실험)</h2>
         <span className="font-numeric tnum text-sm text-text-muted">
           예산 <span data-testid="intervention-points">{interventionPoints.toLocaleString("ko-KR")}</span> ·
-          개입 비용 <span className="font-numeric tnum">{costPreview}</span>
+          개입 비용 <span className="font-numeric tnum">{costPreview > 0 ? costPreview : "—"}</span>
         </span>
       </div>
 
@@ -117,9 +138,9 @@ export function InterventionPanel({
             <input
               type="number"
               min={1}
-              max={12}
+              max={24}
               value={months}
-              onChange={(e) => setMonths(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+              onChange={(e) => setMonths(Math.max(1, Math.min(24, Number(e.target.value) || 1)))}
               data-testid="intervention-months"
               className="w-20 rounded-md border border-border bg-surface px-md py-sm font-numeric tnum text-sm text-text"
             />
@@ -158,11 +179,12 @@ export function InterventionPanel({
             <span className="mb-xs block text-sm text-text-muted">사건</span>
             <select
               data-testid="intervention-template"
-              value={templateId}
+              value={effectiveTemplateId}
               onChange={(e) => setTemplateId(e.target.value)}
+              onFocus={onRequestTemplates}
               className="rounded-md border border-border bg-surface px-md py-sm text-sm text-text"
             >
-              {BUILTIN_TEMPLATES.filter((t) => t.kind === "effect" && t.scope === "settlement").map((t) => (
+              {eventTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
@@ -175,7 +197,13 @@ export function InterventionPanel({
           type="button"
           data-testid="intervention-run"
           onClick={handleRun}
-          disabled={!effectiveTarget || interventionPoints < costPreview}
+          disabled={
+            !effectiveTarget ||
+            interventionPoints < costPreview ||
+            disasterBlocked ||
+            (type === "triggerEvent" && !effectiveTemplateId)
+          }
+          title={disasterBlocked ? "종료할 자연재해가 없습니다" : undefined}
           className="flex items-center gap-xs rounded-md bg-primary px-md py-sm text-sm font-medium text-on-primary hover:bg-blue-700 disabled:opacity-50"
         >
           <HandHeart size={14} aria-hidden />
