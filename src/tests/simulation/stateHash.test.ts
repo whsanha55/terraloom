@@ -46,4 +46,28 @@ describe("computeStateHash (상태 해시 직렬화 표준 §7.2 / T2)", () => {
     b.clock.paused = true;
     expect(computeStateHash(a)).toBe(computeStateHash(b));
   });
+
+  it("도시 정책(migrationOpenness·tradePriority)이 해시에 반영된다 (§24.2)", () => {
+    const a = makeState("hash-policy");
+    const b = makeState("hash-policy");
+    const first = Object.keys(b.settlements)[0]!;
+    b.settlements[first]!.policies = { migrationOpenness: 1, tradePriority: 1.8 };
+    expect(computeStateHash(a)).not.toBe(computeStateHash(b));
+  });
+
+  it("개입 기록의 파라미터 차이가 해시에 반영된다 (재현성 §24)", () => {
+    const a = makeState("hash-itv");
+    const b = makeState("hash-itv");
+    const first = Object.keys(a.settlements)[0]!;
+    const make = (priority: number) => ({
+      id: "itv:tradePriority:1:1",
+      tick: 1,
+      type: "tradePriority",
+      targetIds: [first],
+      parameters: { priority },
+    });
+    a.interventions.push(make(1));
+    b.interventions.push(make(1.8));
+    expect(computeStateHash(a)).not.toBe(computeStateHash(b));
+  });
 });

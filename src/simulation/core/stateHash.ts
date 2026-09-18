@@ -53,6 +53,8 @@ export function computeStateHash(state: WorldState): string {
       stableNumber(s.areaFertility),
       stableNumber(s.areaRiverVolume),
       s.areaBiomeCounts.map(stableNumber).join(","),
+      stableNumber(s.policies.migrationOpenness),
+      stableNumber(s.policies.tradePriority),
     );
   }
 
@@ -78,12 +80,28 @@ export function computeStateHash(state: WorldState): string {
     `h:${state.eventHistory.length}:${lastHistory ? `${lastHistory.id}:${lastHistory.endedTick}` : ""}`,
     `e:${state.probabilityEvaluations.length}`,
     `llm:${state.llmRecords.length}`,
-    `itv:${state.interventions.length}:${state.interventionPoints}`,
+    `itv:${state.interventions.length}:${state.interventionPoints}:${interventionDigest(state)}`,
     statsDigest(state),
     ledgerDigest(state),
   );
 
   return fnv1a32(parts.join("")).toString(16).padStart(8, "0");
+}
+
+/** 개입 재현 입력 요약 — 유형·틱·대상·파라미터(키 정렬). 같은 개입 수라도 내용이 다르면 해시가 갈라진다 */
+function interventionDigest(state: WorldState): string {
+  return state.interventions
+    .map((intervention) => {
+      const params = Object.keys(intervention.parameters)
+        .sort()
+        .map((key) => `${key}=${String(intervention.parameters[key])}`)
+        .join(",");
+      return `${intervention.type}:${intervention.tick}:${intervention.targetIds
+        .slice()
+        .sort()
+        .join("+")}:${params}`;
+    })
+    .join(";");
 }
 
 /** 통계 요약 — 같은 틱에서는 마지막 값과 길이만으로 충분하다 (전체 열거 비용 회피) */
