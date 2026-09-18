@@ -11,6 +11,7 @@ import { SIMULATION_VERSION } from "@/world/model/version";
 import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 import { computeSettlementArea } from "@/world/model/territory";
+import { ChangeLedger } from "@/simulation/systems/ledger";
 import type { SimSpeed } from "@/workers/protocol";
 
 export interface SimulationClock {
@@ -39,6 +40,10 @@ export interface SettlementState {
   migrationPressure: number;
   connectedSettlementIds: string[];
   activeEventIds: string[];
+  /** 이번 달 미충족 비율(§9.4) — 인구 정산에서 소진된다 */
+  unmetRatio: number;
+  /** 식량 잔여 개월 = 재고/월 수요 (§12.1 이벤트 조건의 입력) */
+  foodMonthsRemaining: number;
   /** 영역 계약 캐시(§10.4) — 월드젠 시 1회 계산 */
   areaFertility: number;
   areaRiverVolume: number;
@@ -47,6 +52,7 @@ export interface SettlementState {
 
 export interface GlobalStatistics {
   totalPopulation: number[];
+  totalFoodStock: number[];
 }
 
 export interface WorldState {
@@ -64,7 +70,12 @@ export interface WorldState {
   scheduledEvents: [];
   eventHistory: [];
   globalStatistics: GlobalStatistics;
+  /** 인구 변화 원장(§8.3) — 스냅샷·상태 해시 포함 */
+  changeLedger: ChangeLedger;
 }
+
+/** 초기 비축 — 시작 시 3개월분 식량으로 시작한다 */
+export const INITIAL_FOOD_STOCK_MONTHS = 3;
 
 export function initializeWorldState(gen: WorldGenResult): WorldState {
   const { map, config } = gen;
@@ -92,7 +103,7 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
       carryingCapacity,
       foodProduction: 0,
       foodConsumption: 0,
-      foodStock: 0,
+      foodStock: Math.round(carryingCapacity * 0.5) * INITIAL_FOOD_STOCK_MONTHS,
       foodPriceIndex: 1,
       waterSupply: area.riverVolume,
       stability: 70,
@@ -100,6 +111,8 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
       migrationPressure: 0,
       connectedSettlementIds: [],
       activeEventIds: [],
+      unmetRatio: 0,
+      foodMonthsRemaining: INITIAL_FOOD_STOCK_MONTHS,
       areaFertility: area.fertility,
       areaRiverVolume: area.riverVolume,
       areaBiomeCounts: area.biomeCounts,
@@ -114,8 +127,10 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
   }
 
   let totalPopulation = 0;
+  let totalFoodStock = 0;
   for (const settlement of Object.values(settlements)) {
     totalPopulation += settlement.population;
+    totalFoodStock += settlement.foodStock;
   }
 
   return {
@@ -132,6 +147,7 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
     activeEvents: [],
     scheduledEvents: [],
     eventHistory: [],
-    globalStatistics: { totalPopulation: [totalPopulation] },
+    globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
+    changeLedger: new ChangeLedger(),
   };
 }

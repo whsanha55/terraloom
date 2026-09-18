@@ -7,9 +7,10 @@ import { computeLandRatio } from "@/world/generation/elevation";
 import type { SettlementGen, RouteGen } from "@/world/generation/settlements";
 import { createDefaultWorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
-import type { SimSpeed, WorldSummary } from "@/workers/protocol";
+import type { SettlementSnapshot, SimSpeed, StatsPoint, WorldSummary } from "@/workers/protocol";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
+import { StatsChart } from "./StatsChart";
 import { TimeControls } from "./TimeControls";
 
 const RESOLUTIONS = [256, 512] as const;
@@ -43,6 +44,7 @@ const INITIAL_SUMMARY: WorldSummary = {
   month: 0,
   season: "winter",
   totalPopulation: 0,
+  totalFoodStock: 0,
   paused: true,
   speed: 1,
 };
@@ -55,12 +57,24 @@ export function GeneratorPanel() {
   const [selectedCell, setSelectedCell] = useState<{ x: number; y: number } | null>(null);
   const [world, setWorld] = useState<WorldView | null>(null);
   const [summary, setSummary] = useState<WorldSummary>(INITIAL_SUMMARY);
+  const [stats, setStats] = useState<StatsPoint[]>([]);
+  const [liveSettlements, setLiveSettlements] = useState<Record<string, SettlementSnapshot>>({});
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
 
   useEffect(() => {
     const client = new SimulationClient({
-      onTickBatch: (notification) => setSummary(notification.summary),
+      onTickBatch: (notification) => {
+        setSummary(notification.summary);
+        setLiveSettlements((prev) => {
+          const next = { ...prev };
+          for (const snapshot of notification.settlements) {
+            next[snapshot.id] = snapshot;
+          }
+          return next;
+        });
+      },
+      onStatsUpdate: (series) => setStats((prev) => [...prev, ...series]),
     });
     clientRef.current = client;
     return () => {
@@ -88,6 +102,8 @@ export function GeneratorPanel() {
         seaLevelCompensated: payload.seaLevelCompensated,
       });
       setSelectedCell(null);
+      setStats([]);
+      setLiveSettlements({});
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -230,8 +246,11 @@ export function GeneratorPanel() {
             layer={layer}
             settlements={world.settlements}
             routes={world.routes}
+            live={liveSettlements}
             onSelectCell={setSelectedCell}
           />
+
+          <StatsChart history={stats} />
 
           {selectedCell && (
             <CellInspector map={world.map} cell={selectedCell} seaLevel={world.seaLevel} />

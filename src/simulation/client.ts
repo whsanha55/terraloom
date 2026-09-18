@@ -4,7 +4,13 @@
  * 타입 안전한 요청 전송과 통지 구독을 제공한다. UI는 이 클라이언트를 통해서만
  * 시뮬레이션 상태에 접근한다(렌더링 전담, §31).
  */
-import type { SimNotification, SimRequest, SimSpeed, WorldReadyPayload } from "@/workers/protocol";
+import type {
+  SimNotification,
+  SimRequest,
+  SimSpeed,
+  StatsPoint,
+  WorldReadyPayload,
+} from "@/workers/protocol";
 import type { WorldConfig } from "@/world/model/worldConfig";
 
 export type TickBatchNotification = Extract<SimNotification, { type: "tickBatch" }>;
@@ -13,6 +19,7 @@ export type SystemStatusNotification = Extract<SimNotification, { type: "systemS
 export interface SimulationClientHandlers {
   onWorldReady?: (world: WorldReadyPayload) => void;
   onTickBatch?: (notification: TickBatchNotification) => void;
+  onStatsUpdate?: (series: StatsPoint[]) => void;
   onSystemStatus?: (notification: SystemStatusNotification) => void;
 }
 
@@ -32,6 +39,9 @@ export class SimulationClient {
           break;
         case "tickBatch":
           handlers.onTickBatch?.(message);
+          break;
+        case "statsUpdate":
+          handlers.onStatsUpdate?.(message.series);
           break;
         case "systemStatus":
           handlers.onSystemStatus?.(message);

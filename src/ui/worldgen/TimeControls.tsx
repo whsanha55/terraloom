@@ -33,7 +33,10 @@ export function TimeControls({ summary, onSetSpeed, onStep }: TimeControlsProps)
         세계력 {summary.year + 1}년 {summary.month + 1}월 ({SEASON_LABELS[summary.season]})
       </p>
       <p className="font-numeric tnum text-text-muted">
-        인구 {summary.totalPopulation.toLocaleString("ko-KR")}
+        인구{" "}
+        <span data-testid="total-population">
+          {summary.totalPopulation.toLocaleString("ko-KR")}
+        </span>
       </p>
 
       <div className="ml-auto flex items-center gap-sm">

@@ -7,6 +7,7 @@
  * - 지도 레이어 제외(시드로 재생성 보장), speed/paused 제외(배속은 결과가 아님)
  */
 import { fnv1a32 } from "@/world/random/seed";
+import { POPULATION_CHANGE_CAUSES } from "@/simulation/systems/ledger";
 import type { WorldState } from "./worldState";
 
 const floatView = new Float64Array(1);
@@ -46,6 +47,8 @@ export function computeStateHash(state: WorldState): string {
       stableNumber(s.migrationPressure),
       s.connectedSettlementIds.slice().sort().join(","),
       s.activeEventIds.slice().sort().join(","),
+      stableNumber(s.unmetRatio),
+      stableNumber(s.foodMonthsRemaining),
       stableNumber(s.areaFertility),
       stableNumber(s.areaRiverVolume),
       s.areaBiomeCounts.map(stableNumber).join(","),
@@ -58,8 +61,22 @@ export function computeStateHash(state: WorldState): string {
 
   parts.push(
     `events:${state.activeEvents.length}/${state.scheduledEvents.length}/${state.eventHistory.length}`,
-    state.globalStatistics.totalPopulation.map(stableNumber).join(","),
+    statsDigest(state),
+    ledgerDigest(state),
   );
 
   return fnv1a32(parts.join("")).toString(16).padStart(8, "0");
+}
+
+/** 통계 요약 — 같은 틱에서는 마지막 값과 길이만으로 충분하다 (전체 열거 비용 회피) */
+function statsDigest(state: WorldState): string {
+  const population = state.globalStatistics.totalPopulation;
+  const food = state.globalStatistics.totalFoodStock;
+  return `stats:${population.length}:${stableNumber(population[population.length - 1] ?? 0)}/${food.length}:${stableNumber(food[food.length - 1] ?? 0)}`;
+}
+
+/** 원장 요약 — 원인별 전체 합 (O(1), §8.3 집계 유지) */
+function ledgerDigest(state: WorldState): string {
+  const totals = state.changeLedger.totalsByCause();
+  return POPULATION_CHANGE_CAUSES.map((cause) => stableNumber(totals[cause])).join(",");
 }

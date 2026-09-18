@@ -37,6 +37,7 @@ export interface WorldSummary {
   month: number;
   season: Season;
   totalPopulation: number;
+  totalFoodStock: number;
   paused: boolean;
   speed: SimSpeed;
 }
@@ -44,6 +45,22 @@ export interface WorldSummary {
 export interface StateChange {
   settlementId: string;
   fields: string[];
+}
+
+/** 도시 라이브 스냅숏 — 지도 마커·상세 표시용 */
+export interface SettlementSnapshot {
+  id: string;
+  population: number;
+  status: "active" | "ruined";
+  foodStock: number;
+  foodMonthsRemaining: number;
+  stability: number;
+}
+
+export interface StatsPoint {
+  tick: number;
+  totalPopulation: number;
+  totalFoodStock: number;
 }
 
 export interface WorldReadyPayload {
@@ -66,9 +83,10 @@ export type SimNotification =
       toTick: number;
       summary: WorldSummary;
       changes: StateChange[];
+      settlements: SettlementSnapshot[];
     }
   | { type: "majorEvent"; eventId: string; paused: boolean } // Step 8+
-  | { type: "statsUpdate"; series: { tick: number; totalPopulation: number }[] } // Step 6+
+  | { type: "statsUpdate"; series: StatsPoint[] } // 마지막 통지 이후 증분
   | {
       type: "systemStatus";
       level: "info" | "warning" | "error";

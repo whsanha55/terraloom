@@ -14,7 +14,15 @@ import { SimulationEngine } from "@/simulation/core/engine";
 import { TickBatcher } from "@/simulation/core/scheduler";
 import { initializeWorldState } from "@/simulation/core/worldState";
 import { generateWorld } from "@/world/generation/generator";
-import type { Season, SimNotification, SimRequest, SimSpeed, WorldSummary } from "./protocol";
+import type {
+  Season,
+  SettlementSnapshot,
+  SimNotification,
+  SimRequest,
+  SimSpeed,
+  StatsPoint,
+  WorldSummary,
+} from "./protocol";
 
 const TICK_INTERVAL_MS: Record<1 | 10 | 100, number> = { 1: 2000, 10: 200, 100: 20 };
 const MAX_BATCH_TICKS = 2000;
@@ -31,6 +39,8 @@ let batcher = new TickBatcher(100);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let speed: SimSpeed = 1;
 let paused = true;
+/** 마지막 statsUpdate 이후 쌓인 증분 통계 지점 */
+let pendingStats: StatsPoint[] = [];
 
 function post(message: SimNotification, transfer?: Transferable[]): void {
   if (transfer && transfer.length > 0) {
@@ -51,8 +61,12 @@ function buildSummary(): WorldSummary {
   if (!engine) throw new Error("summary: 엔진이 없습니다");
   const clock = engine.state.clock;
   let totalPopulation = 0;
+  let totalFoodStock = 0;
   for (const settlement of Object.values(engine.state.settlements)) {
-    if (settlement.status === "active") totalPopulation += settlement.population;
+    if (settlement.status === "active") {
+      totalPopulation += settlement.population;
+      totalFoodStock += settlement.foodStock;
+    }
   }
   return {
     tick: clock.currentTick,
@@ -60,13 +74,37 @@ function buildSummary(): WorldSummary {
     month: clock.month,
     season: seasonOf(clock.month),
     totalPopulation,
+    totalFoodStock,
     paused,
     speed,
   };
 }
 
+function settlementSnapshots(): SettlementSnapshot[] {
+  if (!engine) return [];
+  return Object.values(engine.state.settlements).map((settlement) => ({
+    id: settlement.id,
+    population: settlement.population,
+    status: settlement.status,
+    foodStock: settlement.foodStock,
+    foodMonthsRemaining: settlement.foodMonthsRemaining,
+    stability: settlement.stability,
+  }));
+}
+
 function emitTickBatch(fromTick: number, toTick: number): void {
-  post({ type: "tickBatch", fromTick, toTick, summary: buildSummary(), changes: [] });
+  post({
+    type: "tickBatch",
+    fromTick,
+    toTick,
+    summary: buildSummary(),
+    changes: [],
+    settlements: settlementSnapshots(),
+  });
+  if (pendingStats.length > 0) {
+    post({ type: "statsUpdate", series: pendingStats });
+    pendingStats = [];
+  }
 }
 
 function runTicks(count: number): void {
@@ -74,6 +112,12 @@ function runTicks(count: number): void {
   const now = performance.now();
   for (let i = 0; i < count; i++) {
     engine.tick();
+    const stats = engine.state.globalStatistics;
+    pendingStats.push({
+      tick: engine.state.clock.currentTick,
+      totalPopulation: stats.totalPopulation[stats.totalPopulation.length - 1] ?? 0,
+      totalFoodStock: stats.totalFoodStock[stats.totalFoodStock.length - 1] ?? 0,
+    });
     const batch = batcher.onTick(engine.state.clock.currentTick, now);
     if (batch) {
       emitTickBatch(batch.fromTick, batch.toTick);
@@ -106,6 +150,7 @@ function handleInit(request: Extract<SimRequest, { type: "init" }>): void {
   batcher = new TickBatcher(100);
   speed = 1;
   paused = true;
+  pendingStats = [];
   schedule(); // 일시 정지 상태로 시작 — 타이머 없음
 
   const { map } = gen;
@@ -135,6 +180,21 @@ function handleInit(request: Extract<SimRequest, { type: "init" }>): void {
   );
   // 초기 요약 즉시 통지 — UI가 재생 전 상태를 표시할 수 있게
   emitTickBatch(0, 0);
+  pendingStats = [
+    {
+      tick: 0,
+      totalPopulation:
+        engine.state.globalStatistics.totalPopulation[
+          engine.state.globalStatistics.totalPopulation.length - 1
+        ] ?? 0,
+      totalFoodStock:
+        engine.state.globalStatistics.totalFoodStock[
+          engine.state.globalStatistics.totalFoodStock.length - 1
+        ] ?? 0,
+    },
+  ];
+  post({ type: "statsUpdate", series: pendingStats });
+  pendingStats = [];
 }
 
 function handleSetSpeed(request: Extract<SimRequest, { type: "setSpeed" }>): void {

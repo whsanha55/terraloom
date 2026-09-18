@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { RouteGen, SettlementGen } from "@/world/generation/settlements";
 import type { WorldMap } from "@/world/model/worldMap";
+import type { SettlementSnapshot } from "@/workers/protocol";
 import { renderElevationRGBA } from "@/world/rendering/elevationRender";
 import { renderBiomeRGBA, renderScalarRGBA } from "@/world/rendering/layerRender";
 
@@ -26,6 +27,8 @@ interface MapCanvasProps {
   layer: MapLayer;
   settlements: SettlementGen[];
   routes: RouteGen[];
+  /** 라이브 도시 상태 (인구·폐허 여부) — 도착 전까지 정적 표시 */
+  live?: Record<string, SettlementSnapshot>;
   onSelectCell?: (cell: { x: number; y: number }) => void;
 }
 
@@ -35,6 +38,7 @@ export function MapCanvas({
   layer,
   settlements,
   routes,
+  live,
   onSelectCell,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -90,19 +94,33 @@ export function MapCanvas({
       }
       ctx.stroke();
 
-      // 도시 = 파란 원 (DESIGN.md 지도 마커 규칙)
-      ctx.fillStyle = "#2563EB";
-      ctx.strokeStyle = "#FFFFFF";
+      // 도시 = 파란 원, 면적 ∝ 인구 (DESIGN.md). 폐허는 중립 흔적(§8.2)
       ctx.lineWidth = Math.max(1, scale);
-      const radius = Math.max(2, scale * 2);
       for (const settlement of settlements) {
+        const snapshot = live?.[settlement.id];
+        const population = snapshot?.population ?? 0;
+        const cx = settlement.x + 0.5;
+        const cy = settlement.y + 0.5;
+        if (snapshot?.status === "ruined") {
+          ctx.strokeStyle = "rgba(100, 116, 139, 0.6)";
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(1.5, scale * 1.5), 0, Math.PI * 2);
+          ctx.stroke();
+          continue;
+        }
+        const radius = Math.min(
+          Math.max(Math.sqrt(Math.max(population, 1) / 3000) * 1.6 * scale, 2 * scale),
+          7 * scale,
+        );
+        ctx.fillStyle = "#2563EB";
+        ctx.strokeStyle = "#FFFFFF";
         ctx.beginPath();
-        ctx.arc(settlement.x + 0.5, settlement.y + 0.5, radius, 0, Math.PI * 2);
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
     }
-  }, [map, seaLevel, layer, settlements, routes]);
+  }, [map, seaLevel, layer, settlements, routes, live]);
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onSelectCell) return;
