@@ -59,6 +59,13 @@ function randomSeed(): string {
 /** 도시별 시계열 버퍼 상한 — 240 지점(약 20년) (§34 UI 변경 사항만 전달) */
 const CITY_SERIES_CAP = 240;
 
+/** worker 시스템 상태(§22.1) — 최근 3건만 노출 */
+interface SystemStatusEntry {
+  id: number;
+  level: "info" | "warning" | "error";
+  message: string;
+}
+
 interface WorldView {
   seed: string;
   map: WorldMap;
@@ -127,8 +134,10 @@ export function GeneratorPanel() {
   const [compareAId, setCompareAId] = useState("");
   const [compareBId, setCompareBId] = useState("");
   const [interventionLog, setInterventionLog] = useState<InterventionLogEntry[]>([]);
+  const [systemStatuses, setSystemStatuses] = useState<SystemStatusEntry[]>([]);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
+  const statusSeqRef = useRef(0);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const citySeriesRef = useRef<Record<string, CitySeriesPoint[]>>({});
   const watchModeRef = useRef(false);
@@ -271,6 +280,16 @@ export function GeneratorPanel() {
         setSnapshots(list);
         setCompareAId((prev) => (prev === "" && list.length > 0 ? list[0]!.id : prev));
         setCompareBId((prev) => (prev === "" && list.length > 1 ? list[list.length - 1]!.id : prev));
+      },
+      onSystemStatus: (notification) => {
+        // §22.1 — worker 오류·거부를 사용자에게 보인다 (swallow 금지)
+        if (notification.code === "llm_chain_no_context") {
+          setChainStatus("idle"); // 요청이 성립하지 않았다 — 로딩 상태 해제
+        }
+        setSystemStatuses((prev) => [
+          ...prev.slice(-2),
+          { id: ++statusSeqRef.current, level: notification.level, message: notification.message },
+        ]);
       },
       onWorldRestored: (result) => {
         setEventLog([]);
@@ -431,13 +450,23 @@ export function GeneratorPanel() {
     }
   };
 
+  /** §23 늦은 응답 폐기 방지 — 수동 추천 검토 중엔 세계가 바뀌지 않게 자동 정지 */
+  const pauseForReview = () => {
+    if (!summaryRef.current.paused) {
+      clientRef.current?.setSpeed(0);
+      setPauseReason("추천 검토 중 — 승인·거부 후 재생해 주세요");
+    }
+  };
+
   const handleLLMRequest = () => {
     setLlmStatus("loading");
+    pauseForReview();
     clientRef.current?.requestLLM();
   };
 
   const handleChainRequest = (eventId: string) => {
     setChainStatus("loading");
+    pauseForReview();
     clientRef.current?.requestLLMChain(eventId);
   };
 
@@ -561,6 +590,25 @@ export function GeneratorPanel() {
               사건 정지: {majorEvent.name} — {majorEvent.targetName} (중요도{" "}
               <span className="font-numeric tnum">{majorEvent.importance}</span>) · 재생으로 계속
             </p>
+          )}
+
+          {systemStatuses.length > 0 && (
+            <ul data-testid="system-status" aria-live="polite" className="mt-sm space-y-xs">
+              {systemStatuses.map((status) => (
+                <li
+                  key={status.id}
+                  className={
+                    status.level === "error"
+                      ? "rounded-md bg-[#FEF2F2] px-md py-xs text-sm text-error"
+                      : status.level === "warning"
+                        ? "rounded-md bg-[#FFF7ED] px-md py-xs text-sm text-warning"
+                        : "rounded-md bg-accent px-md py-xs text-sm text-text"
+                  }
+                >
+                  {status.message}
+                </li>
+              ))}
+            </ul>
           )}
 
           <EventTimeline

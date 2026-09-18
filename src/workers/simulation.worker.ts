@@ -548,12 +548,14 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
               })()
             : undefined;
         if (request.mode === "chain" && !chain) {
+          // 문맥 생성 실패 — 일반 추천 요청으로 위장해 보내지 않는다 (UI 상태 머신 보호)
           post({
             type: "systemStatus",
             level: "info",
             code: "llm_chain_no_context",
             message: "연쇄 문맥을 만들 수 없습니다 — 진행 중인 사건을 선택하세요",
           });
+          break;
         }
         post({
           type: "llmRequest",
