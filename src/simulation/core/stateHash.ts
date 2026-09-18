@@ -76,6 +76,7 @@ export function computeStateHash(state: WorldState): string {
   parts.push(
     `h:${state.eventHistory.length}:${lastHistory ? `${lastHistory.id}:${lastHistory.endedTick}` : ""}`,
     `e:${state.probabilityEvaluations.length}`,
+    `llm:${state.llmRecords.length}`,
     statsDigest(state),
     ledgerDigest(state),
   );

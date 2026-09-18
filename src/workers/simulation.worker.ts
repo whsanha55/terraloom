@@ -16,6 +16,9 @@ import { initializeWorldState } from "@/simulation/core/worldState";
 import { MAJOR_EVENT_IMPORTANCE, type EventNotice } from "@/simulation/events/engine";
 import { describeEvent } from "@/simulation/events/detail";
 import { POPULATION_CHANGE_CAUSES } from "@/simulation/systems/ledger";
+import { summarizeForLLM, computeInputHash } from "@/llm/gateway/summary";
+import { registerLLMTemplate } from "@/llm/records";
+import { registeredTemplateNames } from "@/llm/validation/safety";
 import { generateWorld } from "@/world/generation/generator";
 import type {
   CityDetail,
@@ -351,6 +354,39 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
       break;
     case "setMajorThreshold":
       majorThreshold = Math.max(0, Math.min(100, request.threshold));
+      break;
+    case "requestLLM":
+      if (!engine) break;
+      // §18 요약 + §23 입력 해시 + 중복 검사용 등록 이름 목록 (LLM은 UI 게이트웨이가 담당)
+      {
+        const input = summarizeForLLM(engine.state);
+        post({
+          type: "llmRequest",
+          input,
+          inputHash: computeInputHash(input),
+          registeredNames: [...registeredTemplateNames(engine.eventEngine.registry)],
+          tick: engine.state.clock.currentTick,
+        });
+      }
+      break;
+    case "registerLLMTemplate":
+      if (!engine) break;
+      {
+        const result = registerLLMTemplate(engine.state, engine.eventEngine, {
+          template: request.template,
+          inputHash: request.inputHash,
+          rawOutput: request.rawOutput,
+          provider: request.provider,
+          model: request.model,
+          promptVersion: request.promptVersion,
+        });
+        if (result.ok) {
+          post({ type: "llmRegistered", ok: true, templateId: result.templateId });
+        } else {
+          post({ type: "systemStatus", level: "warning", code: "llm_register_rejected", message: result.reason ?? "등록 거부" });
+          post({ type: "llmRegistered", ok: false, reason: result.reason });
+        }
+      }
       break;
     default:
       post({

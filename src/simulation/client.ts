@@ -14,11 +14,22 @@ import type {
 } from "@/workers/protocol";
 import type { EventNotice } from "@/simulation/events/engine";
 import type { EventDetailData } from "@/simulation/events/detail";
+import type { LLMInput } from "@/llm/gateway/summary";
+import type { EventTemplate } from "@/simulation/events/types";
 import type { WorldConfig } from "@/world/model/worldConfig";
 
 export type TickBatchNotification = Extract<SimNotification, { type: "tickBatch" }>;
 export type SystemStatusNotification = Extract<SimNotification, { type: "systemStatus" }>;
 export type MajorEventNotification = Extract<SimNotification, { type: "majorEvent" }>;
+
+export interface LLMRegisterPayload {
+  template: EventTemplate;
+  inputHash: string;
+  rawOutput: string;
+  provider: string;
+  model: string;
+  promptVersion: string;
+}
 
 export interface SimulationClientHandlers {
   onWorldReady?: (world: WorldReadyPayload) => void;
@@ -28,6 +39,8 @@ export interface SimulationClientHandlers {
   onMajorEvent?: (notice: EventNotice, paused: boolean) => void;
   onEventDetail?: (detail: EventDetailData | null) => void;
   onCityDetail?: (detail: CityDetail | null) => void;
+  onLLMRequest?: (input: LLMInput, inputHash: string, registeredNames: string[], tick: number) => void;
+  onLLMRegistered?: (result: { ok: boolean; templateId?: string; reason?: string }) => void;
 }
 
 export class SimulationClient {
@@ -62,6 +75,12 @@ export class SimulationClient {
         case "cityDetailResult":
           handlers.onCityDetail?.(message.detail);
           break;
+        case "llmRequest":
+          handlers.onLLMRequest?.(message.input, message.inputHash, message.registeredNames, message.tick);
+          break;
+        case "llmRegistered":
+          handlers.onLLMRegistered?.({ ok: message.ok, templateId: message.templateId, reason: message.reason });
+          break;
         default:
           break;
       }
@@ -94,6 +113,14 @@ export class SimulationClient {
 
   setMajorThreshold(threshold: number): void {
     this.send({ type: "setMajorThreshold", threshold });
+  }
+
+  requestLLM(): void {
+    this.send({ type: "requestLLM" });
+  }
+
+  registerLLMTemplate(payload: LLMRegisterPayload): void {
+    this.send({ type: "registerLLMTemplate", ...payload });
   }
 
   dispose(): void {

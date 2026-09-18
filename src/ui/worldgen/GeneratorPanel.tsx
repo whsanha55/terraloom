@@ -20,6 +20,11 @@ import type { EventDetailData } from "@/simulation/events/detail";
 import { EventTimeline } from "@/ui/timeline/EventTimeline";
 import { EventDetailPanel } from "@/ui/events/EventDetailPanel";
 import { CityDetailPanel, type CitySeriesPoint } from "@/ui/events/CityDetailPanel";
+import { RecommendationPanel } from "@/ui/llm/RecommendationPanel";
+import { MockLLMProvider, OpenAICompatibleProvider } from "@/llm/gateway/provider";
+import { requestRecommendations, type GatewayResult } from "@/llm/gateway/gateway";
+import type { GatewayCandidate } from "@/llm/gateway/gateway";
+import { PROMPT_VERSION } from "@/llm/gateway/prompt";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
 import { StatsChart } from "./StatsChart";
@@ -86,14 +91,28 @@ export function GeneratorPanel() {
   const [watchMode, setWatchMode] = useState(false);
   const [majorThreshold, setMajorThreshold] = useState(80);
   const [pauseReason, setPauseReason] = useState<string | null>(null);
+  const [llmStatus, setLlmStatus] = useState<"idle" | "loading" | "ok" | "fallback">("idle");
+  const [llmResult, setLlmResult] = useState<GatewayResult | null>(null);
+  const [llmInputHash, setLlmInputHash] = useState<string | null>(null);
+  const [approvedTemplateIds, setApprovedTemplateIds] = useState<Set<string>>(new Set());
+  const [providerMode, setProviderMode] = useState<"mock" | "byok">("mock");
+  const [apiKey, setApiKey] = useState(""); // 세션 메모리만 (§30 — 저장 금지)
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const citySeriesRef = useRef<Record<string, CitySeriesPoint[]>>({});
   const watchModeRef = useRef(false);
+  const providerModeRef = useRef<"mock" | "byok">("mock");
+  const apiKeyRef = useRef("");
   useEffect(() => {
     watchModeRef.current = watchMode;
   }, [watchMode]);
+  useEffect(() => {
+    providerModeRef.current = providerMode;
+  }, [providerMode]);
+  useEffect(() => {
+    apiKeyRef.current = apiKey;
+  }, [apiKey]);
 
   useEffect(() => {
     const client = new SimulationClient({
@@ -142,6 +161,26 @@ export function GeneratorPanel() {
       },
       onEventDetail: (detail) => setEventDetail(detail),
       onCityDetail: (detail) => setCityDetail(detail),
+      onLLMRequest: async (input, inputHash, registeredNames) => {
+        setLlmInputHash(inputHash);
+        setLlmStatus("loading");
+        const provider =
+          providerModeRef.current === "byok" && apiKeyRef.current.trim() !== ""
+            ? new OpenAICompatibleProvider({
+                baseUrl: "https://api.openai.com/v1",
+                apiKey: apiKeyRef.current.trim(),
+                model: "gpt-4o-mini",
+              })
+            : new MockLLMProvider();
+        const result = await requestRecommendations(provider, input, new Set(registeredNames));
+        setLlmResult(result);
+        setLlmStatus(result.status);
+      },
+      onLLMRegistered: (result) => {
+        if (result.ok && result.templateId) {
+          setApprovedTemplateIds((prev) => new Set([...prev, result.templateId!]));
+        }
+      },
     });
     clientRef.current = client;
     return () => {
@@ -181,6 +220,10 @@ export function GeneratorPanel() {
       citySeriesRef.current = {};
       setCitySeries({});
       setPauseReason(null);
+      setLlmStatus("idle");
+      setLlmResult(null);
+      setLlmInputHash(null);
+      setApprovedTemplateIds(new Set());
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -233,6 +276,24 @@ export function GeneratorPanel() {
     setSelectedSettlementId(settlementId);
     setSelectedCell(null);
     clientRef.current?.requestCityDetail(settlementId);
+  };
+
+  const handleLLMRequest = () => {
+    setLlmStatus("loading");
+    clientRef.current?.requestLLM();
+  };
+
+  const handleLLMApprove = (candidate: GatewayCandidate) => {
+    const template = candidate.validation.template;
+    if (!template || !llmInputHash || !llmResult) return;
+    clientRef.current?.registerLLMTemplate({
+      template,
+      inputHash: llmInputHash,
+      rawOutput: llmResult.rawOutput,
+      provider: llmResult.provider,
+      model: llmResult.model,
+      promptVersion: PROMPT_VERSION,
+    });
   };
 
   const landRatio = world ? computeLandRatio(world.map.elevation, world.seaLevel) : null;
@@ -412,6 +473,21 @@ export function GeneratorPanel() {
           </div>
 
           <StatsChart history={stats} />
+
+          <div className="mt-md">
+            <RecommendationPanel
+              status={llmStatus}
+              result={llmResult}
+              approvedTemplateIds={approvedTemplateIds}
+              providerMode={providerMode}
+              onProviderModeChange={setProviderMode}
+              apiKey={apiKey}
+              onApiKeyChange={setApiKey}
+              onRequest={handleLLMRequest}
+              onApprove={handleLLMApprove}
+            />
+          </div>
+
 
           {selectedCell && (
             <CellInspector map={world.map} cell={selectedCell} seaLevel={world.seaLevel} />

@@ -18,6 +18,7 @@ import type {
   ProbabilityEvaluation,
   ScheduledWorldEvent,
 } from "@/simulation/events/types";
+import type { LLMGenerationRecord } from "@/llm/records";
 import type { SimSpeed } from "@/workers/protocol";
 
 export interface SimulationClock {
@@ -79,6 +80,8 @@ export interface WorldState {
   eventCooldowns: Record<string, number>;
   /** 발생한 사건의 확률 평가 기록(§13.1) — 근거 보존 */
   probabilityEvaluations: ProbabilityEvaluation[];
+  /** 승인된 LLM 생성 기록(§23) — 재현성. BYOK 키는 절대 포함되지 않는다 */
+  llmRecords: LLMGenerationRecord[];
   globalStatistics: GlobalStatistics;
   /** 인구 변화 원장(§8.3) — 스냅샷·상태 해시 포함 */
   changeLedger: ChangeLedger;
@@ -159,6 +162,7 @@ export function initializeWorldState(gen: WorldGenResult): WorldState {
     eventHistory: [],
     eventCooldowns: {},
     probabilityEvaluations: [],
+    llmRecords: [],
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

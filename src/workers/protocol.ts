@@ -8,6 +8,8 @@
 import type { RouteGen, SettlementGen } from "@/world/generation/settlements";
 import type { EventNotice } from "@/simulation/events/engine";
 import type { EventDetailData } from "@/simulation/events/detail";
+import type { EventTemplate } from "@/simulation/events/types";
+import type { LLMInput } from "@/llm/gateway/summary";
 import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 
@@ -31,7 +33,16 @@ export type SimRequest =
   | { type: "intervene"; intervention: UserIntervention } // Step 14
   | { type: "snapshot" } // Step 13
   | { type: "load"; snapshotId: string } // Step 13
-  | { type: "requestLLM" }; // Step 11
+  | { type: "requestLLM" } // Step 11 — 추천 요청 (수동, 추천 전용 모드)
+  | {
+      type: "registerLLMTemplate"; // Step 11 — 사용자가 승인한 후보 등록
+      template: EventTemplate;
+      inputHash: string;
+      rawOutput: string;
+      provider: string;
+      model: string;
+      promptVersion: string;
+    };
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
@@ -128,6 +139,19 @@ export type SimNotification =
   | { type: "statsUpdate"; series: StatsPoint[] } // 마지막 통지 이후 증분
   | { type: "eventDetailResult"; detail: EventDetailData | null } // Step 10
   | { type: "cityDetailResult"; detail: CityDetail | null } // Step 10
+  | {
+      type: "llmRequest"; // Step 11 — 요약·입력 해시·등록된 이름 목록 전달
+      input: LLMInput;
+      inputHash: string;
+      registeredNames: string[];
+      tick: number;
+    }
+  | {
+      type: "llmRegistered"; // 승인 등록 결과
+      ok: boolean;
+      templateId?: string;
+      reason?: string;
+    }
   | {
       type: "systemStatus";
       level: "info" | "warning" | "error";

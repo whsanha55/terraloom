@@ -82,6 +82,7 @@ export function makeWorld(
     eventHistory: [] as HistoricalEvent[],
     eventCooldowns: {},
     probabilityEvaluations: [],
+    llmRecords: [],
     globalStatistics: { totalPopulation: [totalPopulation], totalFoodStock: [totalFoodStock] },
     changeLedger: new ChangeLedger(),
   };

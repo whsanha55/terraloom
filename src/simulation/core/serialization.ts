@@ -33,6 +33,7 @@ export interface SerializedDynamicState {
   eventCooldowns: WorldState["eventCooldowns"];
   probabilityEvaluations: WorldState["probabilityEvaluations"];
   globalStatistics: WorldState["globalStatistics"];
+  llmRecords: WorldState["llmRecords"];
   changeLedger: SerializedLedger;
 }
 
@@ -54,6 +55,7 @@ export function serializeDynamicState(state: WorldState): SerializedDynamicState
     eventCooldowns: structuredClone(state.eventCooldowns),
     probabilityEvaluations: structuredClone(state.probabilityEvaluations),
     globalStatistics: structuredClone(state.globalStatistics),
+    llmRecords: structuredClone(state.llmRecords),
     changeLedger: { entries: [...state.changeLedger.all()] },
   };
 }
@@ -97,6 +99,7 @@ export function deserializeDynamicState(
     eventCooldowns: structuredClone(data.eventCooldowns),
     probabilityEvaluations: structuredClone(data.probabilityEvaluations),
     globalStatistics: structuredClone(data.globalStatistics),
+    llmRecords: structuredClone(data.llmRecords),
     changeLedger: ledger,
   };
 }
