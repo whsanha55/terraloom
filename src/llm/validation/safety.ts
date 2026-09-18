@@ -14,13 +14,12 @@ import { fnv1a32 } from "@/world/random/seed";
 import type { LLMRecommendation } from "../schemas/recommendation";
 import type { LLMInput } from "../gateway/summary";
 
-/** §20.3 — (메트릭, 연산)별 한 사건에서 허용되는 범위 */
+/** §20.3 — (메트릭, 연산)별 한 사건에서 허용되는 범위. LLM 후보는 정착지 스코프만 */
 const EFFECT_RANGES: Record<string, [number, number]> = {
   "settlement.foodProduction:multiply": [0.5, 1.5],
   "settlement.stability:add": [-15, 15],
   "settlement.diseaseLevel:add": [-0.2, 0.2],
   "settlement.migrationPressure:add": [-0.3, 0.3],
-  "route.capacity:multiply": [0.3, 1.5],
 };
 
 const BASE_PROBABILITY_RANGE: [number, number] = [0.001, 0.05];

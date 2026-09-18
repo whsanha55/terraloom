@@ -8,6 +8,7 @@
  */
 import { EventEngine } from "@/simulation/events/engine";
 import type { EventTemplate } from "@/simulation/events/types";
+import { validateTemplate } from "@/simulation/events/templates/validate";
 import type { WorldState } from "@/simulation/core/worldState";
 import { summarizeForLLM, computeInputHash } from "./gateway/summary";
 import {
@@ -138,6 +139,16 @@ export function registerLLMTemplate(
   const safety = validateCandidate(probe, summary, registeredTemplateNames(eventEngine.registry));
   if (safety.rejected) {
     return { ok: false, reason: `안전 검증 실패: ${safety.rejected}` };
+  }
+  // 구조 검증(§20.1) — registry.set이 검증을 우회하지 않게 한다.
+  // 여기서 못 걸러진 템플릿은 스냅숏 복원 시 EventEngine 생성자에서 크래시한다.
+  try {
+    validateTemplate(payload.template);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `템플릿 구조 검증 실패: ${error instanceof Error ? error.message : "알 수 없음"}`,
+    };
   }
   try {
     eventEngine.registry.set(payload.template.id, payload.template);

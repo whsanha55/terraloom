@@ -58,6 +58,17 @@ describe("LLM 후보 안전 검증 (§20)", () => {
     expect(result.rejected).toContain("메트릭");
   });
 
+  it("route.* 메트릭 효과는 거부된다 — 후보는 정착지 스코프로만 만들어진다 (§20.2)", () => {
+    const result = validateCandidate(
+      recommendation({
+        effects: [{ targetMetric: "route.capacity", operation: "multiply", value: 0.8 }],
+      }),
+      input(),
+      new Set(),
+    );
+    expect(result.rejected).toContain("route.capacity");
+  });
+
   it("수치 범위 위반은 안전 범위로 보정하고 경고를 남긴다 (§20.3)", () => {
     const result = validateCandidate(
       recommendation({

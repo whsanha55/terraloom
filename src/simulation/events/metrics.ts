@@ -44,14 +44,13 @@ export const KNOWN_METRICS: ReadonlySet<string> = new Set<string>([
   ...WORLD_METRICS,
 ]);
 
-/** LLM이 효과로 수정할 수 있는 메트릭 허용 목록 (§20.2) */
+/** LLM이 효과로 수정할 수 있는 메트릭 허용 목록 (§20.2) — 후보는 정착지 스코프로만 만들어진다 */
 export const EVENT_EDITABLE_METRICS: ReadonlySet<string> = new Set<string>([
   "settlement.foodProduction",
   "settlement.foodStock",
   "settlement.stability",
   "settlement.migrationPressure",
   "settlement.diseaseLevel",
-  "route.capacity",
 ]);
 
 export function resolveMetric(state: WorldState, target: MetricTarget, metric: string): number {

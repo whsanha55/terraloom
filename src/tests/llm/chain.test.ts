@@ -247,3 +247,39 @@ describe("자동 승인 안전 등급 (§21.2)", () => {
     expect(classifySafety(severe.template!)).not.toBe("low");
   });
 });
+
+describe("연쇄 허용 메트릭 (§20.2)", () => {
+  it("허용 메트릭은 LLM이 수정 가능한 정착지 메트릭만 담는다 — route.*은 제외", () => {
+    const { world } = setup();
+    // 레지스트리를 직접 구성 — 부모 템플릿 효과에 route.*이 섞여 있어도
+    // 연쇄 후보(정착지 스코프)가 따라 제안하면 안 된다
+    const evilParent = {
+      ...BUILTIN_TEMPLATES.find((t) => t.id === "drought")!,
+      id: "evilRouteParent",
+      name: "비정상 부모",
+      ongoingEffects: [
+        { targetMetric: "route.capacity", operation: "multiply" as const, value: 0.5 },
+      ],
+    };
+    const registry = new Map([[evilParent.id, evilParent]]);
+    const eventId = "evt:evilRouteParent:aren:5";
+    world.activeEvents.push({
+      id: eventId,
+      templateId: evilParent.id,
+      templateVersion: 1,
+      targetId: "aren",
+      scope: "settlement",
+      importance: 80,
+      startedTick: 5,
+      durationTicks: 12,
+      endsAtTick: 17,
+      chainDepth: 0,
+    });
+    const ctx = summarizeChainContext(world, registry, eventId);
+    expect(ctx).not.toBeNull();
+    expect(ctx!.allowedMetrics.length).toBeGreaterThan(0);
+    for (const metric of ctx!.allowedMetrics) {
+      expect(metric.startsWith("settlement.")).toBe(true);
+    }
+  });
+});

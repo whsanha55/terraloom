@@ -7,6 +7,7 @@
  * 실제 발생 확률은 규칙 엔진이 계산한다(§6/§13).
  */
 import { clamp } from "@/simulation/core/numeric";
+import { EVENT_EDITABLE_METRICS } from "@/simulation/events/metrics";
 import {
   RecommendationResponseSchema,
   RecommendationSchema,
@@ -119,7 +120,10 @@ export function summarizeChainContext(
       .slice(-6)
       .reverse()
       .map((record) => ({ type: `${record.templateId}_occurred`, tick: record.startedTick })),
-    allowedMetrics: [...new Set([...(template ? template.ongoingEffects.map((e) => e.targetMetric) : []), "settlement.stability", "settlement.migrationPressure", "settlement.diseaseLevel", "settlement.foodProduction"])],
+    // 연쇄 후보도 정착지 스코프 — 부모 효과에 route.*이 있어도 제안 목록에는 담지 않는다 (§20.2)
+    allowedMetrics: [...new Set([...(template ? template.ongoingEffects.map((e) => e.targetMetric) : []), "settlement.stability", "settlement.migrationPressure", "settlement.diseaseLevel", "settlement.foodProduction"])].filter((metric) =>
+      EVENT_EDITABLE_METRICS.has(metric),
+    ),
   };
 }
 
