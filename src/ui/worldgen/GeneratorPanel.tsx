@@ -8,6 +8,7 @@ import type { SettlementGen, RouteGen } from "@/world/generation/settlements";
 import { createDefaultWorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 import type {
+  CityDetail,
   MigrationFlow,
   SettlementSnapshot,
   SimSpeed,
@@ -15,6 +16,10 @@ import type {
   WorldSummary,
 } from "@/workers/protocol";
 import type { EventNotice } from "@/simulation/events/engine";
+import type { EventDetailData } from "@/simulation/events/detail";
+import { EventTimeline } from "@/ui/timeline/EventTimeline";
+import { EventDetailPanel } from "@/ui/events/EventDetailPanel";
+import { CityDetailPanel, type CitySeriesPoint } from "@/ui/events/CityDetailPanel";
 import { CellInspector } from "./CellInspector";
 import { MapCanvas, type MapLayer } from "./MapCanvas";
 import { StatsChart } from "./StatsChart";
@@ -34,6 +39,9 @@ function randomSeed(): string {
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/** 도시별 시계열 버퍼 상한 — 240 지점(약 20년) (§34 UI 변경 사항만 전달) */
+const CITY_SERIES_CAP = 240;
 
 interface WorldView {
   seed: string;
@@ -70,8 +78,22 @@ export function GeneratorPanel() {
   const [migrations, setMigrations] = useState<MigrationFlow[]>([]);
   const [eventLog, setEventLog] = useState<EventNotice[]>([]);
   const [majorEvent, setMajorEvent] = useState<EventNotice | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventDetail, setEventDetail] = useState<EventDetailData | null>(null);
+  const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
+  const [cityDetail, setCityDetail] = useState<CityDetail | null>(null);
+  const [citySeries, setCitySeries] = useState<Record<string, CitySeriesPoint[]>>({});
+  const [watchMode, setWatchMode] = useState(false);
+  const [majorThreshold, setMajorThreshold] = useState(80);
+  const [pauseReason, setPauseReason] = useState<string | null>(null);
   const clientRef = useRef<SimulationClient | null>(null);
   const initSeqRef = useRef(0);
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const citySeriesRef = useRef<Record<string, CitySeriesPoint[]>>({});
+  const watchModeRef = useRef(false);
+  useEffect(() => {
+    watchModeRef.current = watchMode;
+  }, [watchMode]);
 
   useEffect(() => {
     const client = new SimulationClient({
@@ -85,12 +107,41 @@ export function GeneratorPanel() {
           }
           return next;
         });
+        // 도시별 시계열 누적 (§27.4 미니 시계열) — UI 메모리에서만 유지
+        const tick = notification.summary.tick;
+        const nextSeries = { ...citySeriesRef.current };
+        for (const snapshot of notification.settlements) {
+          const series = nextSeries[snapshot.id] ?? [];
+          if (series.length === 0 || series[series.length - 1]?.tick !== tick) {
+            nextSeries[snapshot.id] = [
+              ...series,
+              { tick, population: snapshot.population, foodStock: snapshot.foodStock },
+            ].slice(-CITY_SERIES_CAP);
+          }
+        }
+        citySeriesRef.current = nextSeries;
+        setCitySeries(nextSeries);
         if (notification.events.length > 0) {
-          setEventLog((prev) => [...notification.events, ...prev].slice(0, 30));
+          setEventLog((prev) => [...notification.events, ...prev].slice(0, 200));
         }
       },
       onStatsUpdate: (series) => setStats((prev) => [...prev, ...series]),
-      onMajorEvent: (notice) => setMajorEvent(notice),
+      onMajorEvent: (notice) => {
+        setMajorEvent(notice);
+        setPauseReason(`사건 정지: ${notice.name}`);
+        // Watch Mode — 카메라 이동(자동 선택) + 상세 패널 open (§25)
+        if (watchModeRef.current) {
+          setSelectedEventId(notice.id);
+          clientRef.current?.requestEventDetail(notice.id);
+          if (notice.scope === "settlement") {
+            setSelectedSettlementId(notice.targetId);
+            clientRef.current?.requestCityDetail(notice.targetId);
+            mapRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      },
+      onEventDetail: (detail) => setEventDetail(detail),
+      onCityDetail: (detail) => setCityDetail(detail),
     });
     clientRef.current = client;
     return () => {
@@ -123,6 +174,13 @@ export function GeneratorPanel() {
       setMigrations([]);
       setEventLog([]);
       setMajorEvent(null);
+      setSelectedEventId(null);
+      setEventDetail(null);
+      setSelectedSettlementId(null);
+      setCityDetail(null);
+      citySeriesRef.current = {};
+      setCitySeries({});
+      setPauseReason(null);
       if (options?.revealSeed) setSeed(seedValue);
     },
     [resolution, seaLevel],
@@ -142,11 +200,39 @@ export function GeneratorPanel() {
   };
 
   const handleSetSpeed = (speed: SimSpeed) => {
+    if (speed === 0) {
+      setPauseReason(watchModeRef.current ? "수동 정지" : null);
+    } else {
+      setPauseReason(null);
+    }
     clientRef.current?.setSpeed(speed);
   };
 
   const handleStep = (ticks: 1 | 12) => {
     clientRef.current?.step(ticks);
+  };
+
+  const handleWatchModeChange = (enabled: boolean) => {
+    setWatchMode(enabled);
+    if (!enabled) setPauseReason(null);
+    // 관찰 모드 진입 시 정지 상태면 빠른 탐색(100x)으로 재생해 다음 중요 사건까지 진행한다 (§25)
+    if (enabled) clientRef.current?.setSpeed(100);
+  };
+
+  const handleMajorThresholdChange = (threshold: number) => {
+    setMajorThreshold(threshold);
+    clientRef.current?.setMajorThreshold(threshold);
+  };
+
+  const handleSelectEvent = (eventId: string) => {
+    setSelectedEventId(eventId);
+    clientRef.current?.requestEventDetail(eventId);
+  };
+
+  const handleSelectSettlement = (settlementId: string) => {
+    setSelectedSettlementId(settlementId);
+    setSelectedCell(null);
+    clientRef.current?.requestCityDetail(settlementId);
   };
 
   const landRatio = world ? computeLandRatio(world.map.elevation, world.seaLevel) : null;
@@ -213,8 +299,24 @@ export function GeneratorPanel() {
 
       {world ? (
         <>
-          <TimeControls summary={summary} onSetSpeed={handleSetSpeed} onStep={handleStep} />
+          <TimeControls
+            summary={summary}
+            onSetSpeed={handleSetSpeed}
+            onStep={handleStep}
+            watchMode={watchMode}
+            onWatchModeChange={handleWatchModeChange}
+            majorThreshold={majorThreshold}
+            onMajorThresholdChange={handleMajorThresholdChange}
+          />
 
+          {pauseReason && summary.paused && (
+            <p
+              data-testid="pause-reason-badge"
+              className="mt-sm rounded-md bg-accent px-md py-xs text-sm font-medium text-text"
+            >
+              {pauseReason}
+            </p>
+          )}
           {majorEvent && (
             <p
               data-testid="major-event-banner"
@@ -225,33 +327,11 @@ export function GeneratorPanel() {
             </p>
           )}
 
-          {eventLog.length > 0 && (
-            <section className="mt-md" aria-label="최근 사건 로그">
-              <h2 className="text-sm font-semibold text-text">최근 사건 (디버그)</h2>
-              <ul data-testid="event-log" className="mt-xs max-h-40 overflow-y-auto rounded-md border border-border">
-                {eventLog.map((event) => (
-                  <li
-                    key={event.id}
-                    className="flex items-baseline gap-md border-b border-border px-md py-xs last:border-b-0 text-sm"
-                  >
-                    <span className="font-numeric tnum text-text-muted">
-                      {Math.floor(event.startedTick / 12) + 1}년 {(event.startedTick % 12) + 1}월
-                    </span>
-                    <span className="text-text">
-                      {event.name}
-                      {event.causedByName ? (
-                        <span className="text-text-muted"> ← {event.causedByName}</span>
-                      ) : null}
-                    </span>
-                    <span className="text-text-muted">{event.targetName}</span>
-                    <span className="font-numeric tnum ml-auto text-text-muted">
-                      중요도 {event.importance}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <EventTimeline
+            events={eventLog}
+            selectedEventId={selectedEventId}
+            onSelect={handleSelectEvent}
+          />
 
           <div className="mt-md flex flex-wrap items-center gap-md">
             <p className="flex flex-wrap items-center gap-x-md gap-y-xs text-text-muted">
@@ -297,16 +377,39 @@ export function GeneratorPanel() {
             </div>
           </div>
 
-          <MapCanvas
-            map={world.map}
-            seaLevel={world.seaLevel}
-            layer={layer}
-            settlements={world.settlements}
-            routes={world.routes}
-            live={liveSettlements}
-            migrations={migrations}
-            onSelectCell={setSelectedCell}
-          />
+          <div ref={mapRef} className="mt-md">
+            <MapCanvas
+              map={world.map}
+              seaLevel={world.seaLevel}
+              layer={layer}
+              settlements={world.settlements}
+              routes={world.routes}
+              live={liveSettlements}
+              migrations={migrations}
+              selectedSettlementId={selectedSettlementId}
+              onSelectCell={setSelectedCell}
+              onSelectSettlement={handleSelectSettlement}
+            />
+          </div>
+
+          <div className="mt-md grid grid-cols-1 gap-md lg:grid-cols-2">
+            <CityDetailPanel
+              detail={cityDetail}
+              series={selectedSettlementId ? (citySeries[selectedSettlementId] ?? []) : []}
+              onSelectEvent={handleSelectEvent}
+              onClose={() => {
+                setSelectedSettlementId(null);
+                setCityDetail(null);
+              }}
+            />
+            <EventDetailPanel
+              detail={eventDetail}
+              onClose={() => {
+                setSelectedEventId(null);
+                setEventDetail(null);
+              }}
+            />
+          </div>
 
           <StatsChart history={stats} />
 

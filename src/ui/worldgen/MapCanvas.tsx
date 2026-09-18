@@ -6,6 +6,7 @@ import type { WorldMap } from "@/world/model/worldMap";
 import type { MigrationFlow, SettlementSnapshot } from "@/workers/protocol";
 import { renderElevationRGBA } from "@/world/rendering/elevationRender";
 import { renderBiomeRGBA, renderScalarRGBA } from "@/world/rendering/layerRender";
+import { crisisLevel, CRISIS_COLORS, eventMarkerColor } from "@/ui/map/crisis";
 
 export type MapLayer = "elevation" | "temperature" | "moisture" | "biome";
 
@@ -31,7 +32,11 @@ interface MapCanvasProps {
   live?: Record<string, SettlementSnapshot>;
   /** 직전 틱 이주 흐름 — 파란 화살표 (DESIGN.md map-path-migration) */
   migrations?: MigrationFlow[];
+  /** 선택 도시 — 링 강조 (DESIGN.md map-marker-selected) */
+  selectedSettlementId?: string | null;
   onSelectCell?: (cell: { x: number; y: number }) => void;
+  /** 도시 마커 클릭 — 셀 클릭보다 우선한다 */
+  onSelectSettlement?: (settlementId: string) => void;
 }
 
 export function MapCanvas({
@@ -42,7 +47,9 @@ export function MapCanvas({
   routes,
   live,
   migrations,
+  selectedSettlementId,
   onSelectCell,
+  onSelectSettlement,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -130,7 +137,8 @@ export function MapCanvas({
         ctx.restore();
       }
 
-      // 도시 = 파란 원, 면적 ∝ 인구 (DESIGN.md). 폐허는 중립 흔적(§8.2)
+      // 도시 = 원, 면적 ∝ 인구 (DESIGN.md). 채움색은 식량 위기 수준(§26 위험은 주황·빨강).
+      // 폐허는 중립 흔적(§8.2). 활성 사건은 위험도색 다이아몬드로 오버레이.
       ctx.lineWidth = Math.max(1, scale);
       for (const settlement of settlements) {
         const snapshot = live?.[settlement.id];
@@ -148,18 +156,48 @@ export function MapCanvas({
           Math.max(Math.sqrt(Math.max(population, 1) / 3000) * 1.6 * scale, 2 * scale),
           7 * scale,
         );
-        ctx.fillStyle = "#2563EB";
+        ctx.fillStyle = CRISIS_COLORS[crisisLevel(snapshot?.foodMonthsRemaining ?? 99)];
         ctx.strokeStyle = "#FFFFFF";
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+
+        // 선택 링 — 모든 상태에서 동일 방식 (DESIGN.md map-marker-selected)
+        if (settlement.id === selectedSettlementId) {
+          ctx.strokeStyle = "#2563EB";
+          ctx.lineWidth = Math.max(1.5, scale * 2.5);
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius + Math.max(1.5, scale * 2), 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.lineWidth = Math.max(1, scale);
+        }
+
+        // 활성 사건 다이아몬드 (DESIGN.md — 사건 = 위험도색 다이아몬드)
+        const maxImportance = snapshot?.activeEvents?.reduce(
+          (max, e) => Math.max(max, e.importance),
+          0,
+        );
+        if (maxImportance && maxImportance > 0) {
+          const size = Math.max(2.5, scale * 3);
+          ctx.fillStyle = eventMarkerColor(maxImportance);
+          ctx.beginPath();
+          ctx.moveTo(cx + size, cy - radius - size);
+          ctx.lineTo(cx + size * 2, cy - radius);
+          ctx.lineTo(cx + size, cy - radius + size);
+          ctx.lineTo(cx, cy - radius);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = Math.max(0.75, scale * 0.75);
+          ctx.stroke();
+          ctx.lineWidth = Math.max(1, scale);
+        }
       }
     }
-  }, [map, seaLevel, layer, settlements, routes, live, migrations]);
+  }, [map, seaLevel, layer, settlements, routes, live, migrations, selectedSettlementId]);
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onSelectCell) return;
     const canvas = event.currentTarget;
     const rect = canvas.getBoundingClientRect();
     const x = Math.min(
@@ -170,7 +208,27 @@ export function MapCanvas({
       map.height - 1,
       Math.max(0, Math.floor((event.clientY - rect.top) * (map.height / rect.height))),
     );
-    onSelectCell({ x, y });
+    // 도시 마커 클릭이 셀 검사보다 우선한다 (§27.4 도시 상세 진입)
+    if (onSelectSettlement) {
+      const scale = map.width / 256;
+      let nearest: { id: string; distance2: number } | null = null;
+      for (const settlement of settlements) {
+        const live0 = live?.[settlement.id];
+        if (live0?.status === "ruined") continue;
+        const dx = settlement.x + 0.5 - x;
+        const dy = settlement.y + 0.5 - y;
+        const distance2 = dx * dx + dy * dy;
+        const threshold = Math.max(3, 7 * scale + 2);
+        if (distance2 <= threshold * threshold && (!nearest || distance2 < nearest.distance2)) {
+          nearest = { id: settlement.id, distance2 };
+        }
+      }
+      if (nearest) {
+        onSelectSettlement(nearest.id);
+        return;
+      }
+    }
+    onSelectCell?.({ x, y });
   };
 
   return (

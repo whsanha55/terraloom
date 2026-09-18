@@ -5,6 +5,7 @@
  * 시뮬레이션 상태에 접근한다(렌더링 전담, §31).
  */
 import type {
+  CityDetail,
   SimNotification,
   SimRequest,
   SimSpeed,
@@ -12,6 +13,7 @@ import type {
   WorldReadyPayload,
 } from "@/workers/protocol";
 import type { EventNotice } from "@/simulation/events/engine";
+import type { EventDetailData } from "@/simulation/events/detail";
 import type { WorldConfig } from "@/world/model/worldConfig";
 
 export type TickBatchNotification = Extract<SimNotification, { type: "tickBatch" }>;
@@ -24,6 +26,8 @@ export interface SimulationClientHandlers {
   onStatsUpdate?: (series: StatsPoint[]) => void;
   onSystemStatus?: (notification: SystemStatusNotification) => void;
   onMajorEvent?: (notice: EventNotice, paused: boolean) => void;
+  onEventDetail?: (detail: EventDetailData | null) => void;
+  onCityDetail?: (detail: CityDetail | null) => void;
 }
 
 export class SimulationClient {
@@ -52,6 +56,12 @@ export class SimulationClient {
         case "majorEvent":
           handlers.onMajorEvent?.(message.notice, message.paused);
           break;
+        case "eventDetailResult":
+          handlers.onEventDetail?.(message.detail);
+          break;
+        case "cityDetailResult":
+          handlers.onCityDetail?.(message.detail);
+          break;
         default:
           break;
       }
@@ -72,6 +82,18 @@ export class SimulationClient {
 
   step(ticks: 1 | 12): void {
     this.send({ type: "step", ticks });
+  }
+
+  requestEventDetail(eventId: string): void {
+    this.send({ type: "eventDetail", eventId });
+  }
+
+  requestCityDetail(settlementId: string): void {
+    this.send({ type: "cityDetail", settlementId });
+  }
+
+  setMajorThreshold(threshold: number): void {
+    this.send({ type: "setMajorThreshold", threshold });
   }
 
   dispose(): void {

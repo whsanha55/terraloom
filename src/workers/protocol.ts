@@ -7,6 +7,7 @@
  */
 import type { RouteGen, SettlementGen } from "@/world/generation/settlements";
 import type { EventNotice } from "@/simulation/events/engine";
+import type { EventDetailData } from "@/simulation/events/detail";
 import type { WorldConfig } from "@/world/model/worldConfig";
 import type { WorldMap } from "@/world/model/worldMap";
 
@@ -24,6 +25,9 @@ export type SimRequest =
   | { type: "init"; config: WorldConfig; seaLevel?: number }
   | { type: "setSpeed"; speed: SimSpeed }
   | { type: "step"; ticks: 1 | 12 }
+  | { type: "eventDetail"; eventId: string } // Step 10 — 사건 상세 요청
+  | { type: "cityDetail"; settlementId: string } // Step 10 — 도시 상세(원인 분해) 요청
+  | { type: "setMajorThreshold"; threshold: number } // Step 10 — 자동 정지 임계(§25)
   | { type: "intervene"; intervention: UserIntervention } // Step 14
   | { type: "snapshot" } // Step 13
   | { type: "load"; snapshotId: string } // Step 13
@@ -59,6 +63,27 @@ export interface SettlementSnapshot {
   foodMonthsRemaining: number;
   stability: number;
   migrationPressure: number;
+  diseaseLevel: number;
+  /** 활성 사건 (§14.1 도시별 최대 3) — 지도 다이아몬드·도시 상세용 */
+  activeEvents: Array<{ id: string; name: string; importance: number }>;
+}
+
+/** 도시 상세 — 원장 기반 인구 변화 원인 분해(§2.1) 포함 */
+export interface CityDetail {
+  settlementId: string;
+  name: string;
+  status: "active" | "ruined";
+  population: number;
+  carryingCapacity: number;
+  foodStock: number;
+  foodMonthsRemaining: number;
+  stability: number;
+  diseaseLevel: number;
+  /** 최근 5년(60틱) 원인별 증감 — §8.3 원장 집계 */
+  causeBreakdown: Array<{ cause: string; amount: number }>;
+  breakdownFromTick: number;
+  currentTick: number;
+  activeEvents: Array<{ id: string; name: string; importance: number; startedTick: number }>;
 }
 
 /** 직전 틱의 이주 흐름 — 지도 화살표 시각화(§25) */
@@ -101,6 +126,8 @@ export type SimNotification =
     }
   | { type: "majorEvent"; notice: EventNotice; paused: boolean } // Step 8 — 중요 사건 자동 정지
   | { type: "statsUpdate"; series: StatsPoint[] } // 마지막 통지 이후 증분
+  | { type: "eventDetailResult"; detail: EventDetailData | null } // Step 10
+  | { type: "cityDetailResult"; detail: CityDetail | null } // Step 10
   | {
       type: "systemStatus";
       level: "info" | "warning" | "error";

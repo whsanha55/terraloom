@@ -14,8 +14,11 @@ import { SimulationEngine } from "@/simulation/core/engine";
 import { TickBatcher } from "@/simulation/core/scheduler";
 import { initializeWorldState } from "@/simulation/core/worldState";
 import { MAJOR_EVENT_IMPORTANCE, type EventNotice } from "@/simulation/events/engine";
+import { describeEvent } from "@/simulation/events/detail";
+import { POPULATION_CHANGE_CAUSES } from "@/simulation/systems/ledger";
 import { generateWorld } from "@/world/generation/generator";
 import type {
+  CityDetail,
   Season,
   SettlementSnapshot,
   SimNotification,
@@ -40,6 +43,8 @@ let batcher = new TickBatcher(100);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let speed: SimSpeed = 1;
 let paused = true;
+/** 중요 사건 자동 정지 임계 (§25 — 설정에서 조절 가능) */
+let majorThreshold = MAJOR_EVENT_IMPORTANCE;
 /** 직전 틱 이주 총인원 */
 function lastFlowsTotal(): number {
   if (!engine) return 0;
@@ -104,6 +109,15 @@ function settlementSnapshots(): SettlementSnapshot[] {
     foodMonthsRemaining: settlement.foodMonthsRemaining,
     stability: settlement.stability,
     migrationPressure: settlement.migrationPressure,
+    diseaseLevel: settlement.diseaseLevel,
+    activeEvents: settlement.activeEventIds
+      .map((id) => engine!.state.activeEvents.find((e) => e.id === id))
+      .filter((e) => e !== undefined)
+      .map((e) => ({
+        id: e!.id,
+        name: engine!.eventEngine.registry.get(e!.templateId)?.name ?? e!.templateId,
+        importance: e!.importance,
+      })),
   }));
 }
 
@@ -154,7 +168,7 @@ function runTicks(count: number): void {
     pendingNotices.push(...engine.lastTickNotices);
 
     // §9.5 — 중요 사건 즉시 통지 + 자체 정지. UI 응답 전 추가 틱 없음
-    const major = engine.lastTickNotices.find((n) => n.importance >= MAJOR_EVENT_IMPORTANCE);
+    const major = engine.lastTickNotices.find((n) => n.importance >= majorThreshold);
     if (major) {
       paused = true;
       engine.state.clock.paused = true;
@@ -268,6 +282,42 @@ function handleSetSpeed(request: Extract<SimRequest, { type: "setSpeed" }>): voi
   }
 }
 
+/** 도시 상세 — 원장 집계(§8.3)로 인구 변화 원인 분해를 만든다 (§2.1) */
+function buildCityDetail(settlementId: string): CityDetail | null {
+  if (!engine) return null;
+  const settlement = engine.state.settlements[settlementId];
+  if (!settlement) return null;
+  const toTick = engine.state.clock.currentTick;
+  const fromTick = Math.max(0, toTick - 60); // 최근 5년
+  const aggregate = engine.state.changeLedger.aggregate(settlementId, fromTick, toTick);
+  const causeBreakdown = POPULATION_CHANGE_CAUSES.filter((cause) => aggregate[cause] !== 0).map(
+    (cause) => ({ cause, amount: aggregate[cause] }),
+  );
+  return {
+    settlementId,
+    name: settlement.name,
+    status: settlement.status,
+    population: settlement.population,
+    carryingCapacity: settlement.carryingCapacity,
+    foodStock: settlement.foodStock,
+    foodMonthsRemaining: settlement.foodMonthsRemaining,
+    stability: settlement.stability,
+    diseaseLevel: settlement.diseaseLevel,
+    causeBreakdown,
+    breakdownFromTick: fromTick,
+    currentTick: toTick,
+    activeEvents: settlement.activeEventIds
+      .map((id) => engine!.state.activeEvents.find((e) => e.id === id))
+      .filter((e) => e !== undefined)
+      .map((e) => ({
+        id: e!.id,
+        name: engine!.eventEngine.registry.get(e!.templateId)?.name ?? e!.templateId,
+        importance: e!.importance,
+        startedTick: e!.startedTick,
+      })),
+  };
+}
+
 ctx.onmessage = (event: MessageEvent<SimRequest>) => {
   const request = event.data;
   switch (request.type) {
@@ -285,6 +335,22 @@ ctx.onmessage = (event: MessageEvent<SimRequest>) => {
         const batch = batcher.flush(now);
         if (batch) emitTickBatch(batch.fromTick, batch.toTick);
       }
+      break;
+    case "eventDetail":
+      if (!engine) {
+        post({ type: "eventDetailResult", detail: null });
+        break;
+      }
+      post({
+        type: "eventDetailResult",
+        detail: describeEvent(engine.state, engine.eventEngine.registry, request.eventId),
+      });
+      break;
+    case "cityDetail":
+      post({ type: "cityDetailResult", detail: buildCityDetail(request.settlementId) });
+      break;
+    case "setMajorThreshold":
+      majorThreshold = Math.max(0, Math.min(100, request.threshold));
       break;
     default:
       post({

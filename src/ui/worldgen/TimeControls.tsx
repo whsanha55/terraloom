@@ -1,6 +1,6 @@
 "use client";
 
-import { Pause, Play, SkipForward } from "lucide-react";
+import { Pause, Play, SkipForward, Eye } from "lucide-react";
 import type { SimSpeed, WorldSummary } from "@/workers/protocol";
 
 const SEASON_LABELS: Record<WorldSummary["season"], string> = {
@@ -21,10 +21,24 @@ interface TimeControlsProps {
   summary: WorldSummary;
   onSetSpeed: (speed: SimSpeed) => void;
   onStep: (ticks: 1 | 12) => void;
+  /** Watch Mode (§25) — 다음 중요 사건까지 자동 재생 → 자동 정지 반복 */
+  watchMode: boolean;
+  onWatchModeChange: (enabled: boolean) => void;
+  /** 자동 정지 임계(중요도) — 설정에서 조절 (§25) */
+  majorThreshold: number;
+  onMajorThresholdChange: (threshold: number) => void;
 }
 
-/** 시간 제어 패널 (§25 상단 그룹의 Step 5 버전) */
-export function TimeControls({ summary, onSetSpeed, onStep }: TimeControlsProps) {
+/** 시간 제어 패널 (§25 상단 그룹의 Step 10 버전 — Watch Mode 포함) */
+export function TimeControls({
+  summary,
+  onSetSpeed,
+  onStep,
+  watchMode,
+  onWatchModeChange,
+  majorThreshold,
+  onMajorThresholdChange,
+}: TimeControlsProps) {
   const resumeSpeed: Exclude<SimSpeed, 0> = summary.speed === 0 ? 1 : summary.speed;
 
   return (
@@ -91,6 +105,37 @@ export function TimeControls({ summary, onSetSpeed, onStep }: TimeControlsProps)
           </button>
         ))}
       </div>
+
+      <label className="flex items-center gap-xs" aria-label="관찰 모드">
+        <button
+          type="button"
+          data-testid="watch-mode-toggle"
+          aria-pressed={watchMode}
+          onClick={() => onWatchModeChange(!watchMode)}
+          className={
+            watchMode
+              ? "flex items-center gap-xs rounded-md bg-primary px-md py-xs text-sm font-medium text-on-primary"
+              : "flex items-center gap-xs rounded-md border border-border bg-surface px-md py-xs text-sm text-text-muted hover:bg-accent hover:text-text"
+          }
+        >
+          <Eye size={14} aria-hidden />
+          관찰 모드
+        </button>
+      </label>
+      <label className="flex items-center gap-xs text-sm text-text-muted">
+        <span className="whitespace-nowrap">자동 정지 임계</span>
+        <select
+          data-testid="major-threshold"
+          value={majorThreshold}
+          onChange={(e) => onMajorThresholdChange(Number(e.target.value))}
+          className="rounded-md border border-border bg-surface px-sm py-xs text-text"
+          aria-label="자동 정지 임계(중요도)"
+        >
+          <option value={80}>중요도 80+</option>
+          <option value={70}>중요도 70+</option>
+          <option value={60}>중요도 60+</option>
+        </select>
+      </label>
     </div>
   );
 }
